@@ -1,0 +1,731 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "tableId": "estoque",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "ID",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "Nome Produto",
+              "fieldValue": "={{ $json.nomeProduto }}"
+            },
+            {
+              "fieldId": "Tamanho",
+              "fieldValue": "={{ $json.tamanhos }}"
+            },
+            {
+              "fieldId": "Preço R$",
+              "fieldValue": "={{ $json.amount }}"
+            },
+            {
+              "fieldId": "Total Unit.",
+              "fieldValue": "={{ $json.quantity }}"
+            },
+            {
+              "fieldId": "26",
+              "fieldValue": "={{ $json.estoque['26'] }}"
+            },
+            {
+              "fieldId": "27",
+              "fieldValue": "={{ $json.estoque['27'] }}"
+            },
+            {
+              "fieldId": "28",
+              "fieldValue": "={{ $json.estoque['28'] }}"
+            },
+            {
+              "fieldId": "29",
+              "fieldValue": "={{ $json.estoque['29'] }}"
+            },
+            {
+              "fieldId": "30",
+              "fieldValue": "={{ $json.estoque['30'] }}"
+            },
+            {
+              "fieldId": "31",
+              "fieldValue": "={{ $json.estoque['31'] }}"
+            },
+            {
+              "fieldId": "32",
+              "fieldValue": "={{ $json.estoque['32'] }}"
+            },
+            {
+              "fieldId": "33",
+              "fieldValue": "={{ $json.estoque['33'] }}"
+            },
+            {
+              "fieldId": "34",
+              "fieldValue": "={{ $json.estoque['34'] }}"
+            },
+            {
+              "fieldId": "35",
+              "fieldValue": "={{ $json.estoque['35'] }}"
+            },
+            {
+              "fieldId": "36",
+              "fieldValue": "={{ $json.estoque['36'] }}"
+            },
+            {
+              "fieldId": "37",
+              "fieldValue": "={{ $json.estoque['37'] }}"
+            },
+            {
+              "fieldId": "38",
+              "fieldValue": "={{ $json.estoque['38'] }}"
+            },
+            {
+              "fieldId": "39",
+              "fieldValue": "={{ $json.estoque['39'] }}"
+            },
+            {
+              "fieldId": "40",
+              "fieldValue": "={{ $json.estoque['40'] }}"
+            },
+            {
+              "fieldId": "41",
+              "fieldValue": "={{ $json.estoque['41'] }}"
+            },
+            {
+              "fieldId": "42",
+              "fieldValue": "={{ $json.estoque['42'] }}"
+            },
+            {
+              "fieldId": "43",
+              "fieldValue": "={{ $json.estoque['43'] }}"
+            },
+            {
+              "fieldId": "44",
+              "fieldValue": "={{ $json.estoque['44'] }}"
+            },
+            {
+              "fieldId": "45",
+              "fieldValue": "={{ $json.estoque['45'] }}"
+            },
+            {
+              "fieldId": "46",
+              "fieldValue": "={{ $json.estoque['46'] }}"
+            },
+            {
+              "fieldId": "47",
+              "fieldValue": "={{ $json.estoque['47'] }}"
+            },
+            {
+              "fieldId": "48",
+              "fieldValue": "={{ $json.estoque['48'] }}"
+            },
+            {
+              "fieldId": "49",
+              "fieldValue": "={{ $json.estoque['49'] }}"
+            },
+            {
+              "fieldId": "Marca",
+              "fieldValue": "={{ $json.details.brand.name }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        -128
+      ],
+      "id": "c951deee-17fa-48e5-bb76-68d874f39ee5",
+      "name": "Inserir Dados Supabase",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "EMjbzFOIRrE6PfUd",
+          "name": "Supabase Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.API }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        64,
+        -128
+      ],
+      "id": "4d5cc996-fb67-4858-b993-8b0ab3cf46bf",
+      "name": "Buscar Produtos da Categoria (API)",
+      "notesInFlow": false,
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "FqHMDmVkyc7T67zy",
+          "name": "Credencial Site NT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "96b16f96-41c4-48c9-b4dd-5bd24b19ed46",
+              "name": "ID",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "b7ea21b1-a8a5-40c5-908f-d507666ac8fc",
+              "name": "name",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "b03634d2-55b7-4a6a-a811-aa0d12cc096d",
+              "name": "amount",
+              "value": "={{ $json.amount }}",
+              "type": "number"
+            },
+            {
+              "id": "43381170-c50a-4dba-b0a4-78d7d64f8e92",
+              "name": "sizes",
+              "value": "={{ $json.sizes[0].name }}, {{ $json.sizes[1].name }}, {{ $json.sizes[2].name }}, {{ $json.sizes[3].name }}, {{ $json.sizes[4].name }}, {{ $json.sizes[5].name }}, {{ $json.sizes[6].name }}, {{ $json.sizes[7].name }}, {{ $json.sizes[8].name }}, {{ $json.sizes[9].name }}",
+              "type": "string"
+            },
+            {
+              "id": "be29ee5e-1b18-4dad-b1af-53e4080e754a",
+              "name": "Foto",
+              "value": "={{ $json.image[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        288,
+        -128
+      ],
+      "id": "695883c0-89aa-42d0-8773-09b2ca89e6c6",
+      "name": "Pré-processar Dados Brutos API",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // Limpa e padroniza o nome\n  let name = item.json.name?.trim() || '';\n  name = name.replace(/\\s+/g, ' ');\n\n  const amount = Number(item.json.amount).toFixed(2);\n  const foto = item.json.Foto?.trim();\n\n  const regexNumero = /^\\d+$/;\n  const sizesArray = item.json.sizes\n    ?.split(',')\n    .map(s => s.trim())\n    .filter(size =>\n      regexNumero.test(size) &&\n      size !== '0' && size !== '00'\n    );\n\n  const tamanhosFormatados = sizesArray.length > 0 ? sizesArray.join(', ') : '';\n\n  const id = item.json.ID?.trim() || crypto.randomUUID();\n\n  item.json = {\n    id,\n    nome_produto: name,\n    preço: amount,\n    tamanhos_disponiveis: tamanhosFormatados,\n    imagem: foto,\n  };\n}\n\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        -128
+      ],
+      "id": "169a80b6-ee4a-4044-87bc-07469ee84732",
+      "name": "Limpar e Padronizar Dados do Produto"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.calcadosnt.com.br/products/details/by-id/{{ $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        -128
+      ],
+      "id": "a2b8d72a-990a-44cd-b9a6-03dfeede5539",
+      "name": "Buscar Detalhes Completos (API)",
+      "retryOnFail": true,
+      "notesInFlow": false,
+      "alwaysOutputData": false,
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "FqHMDmVkyc7T67zy",
+          "name": "Credencial Site NT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sizesRange = [\"26\", \"27\", \"28\", \"29\", \"30\", \"31\", \"32\", \"33\",\"34\",\"34\", \"35\", \"36\", \"37\", \"38\", \"39\", \"40\", \"41\", \"42\", \"43\", \"44\", \"45\", \"46\", \"47\", \"48\", \"49\"];\nconst result = [];\n\nfor (const item of $input.all()) {\n  const produto = item.json;\n  const nomeProdutoBase = (produto.name ?? \"\").trim();\n  const mapaEstoque = {};\n\n  for (const tipo of (produto.productTypes ?? [])) {\n    const tamanhoBruto = tipo.size?.name ?? \"\";\n    const tamanho = tamanhoBruto.trim();\n\n    // FILTRO: Ignora se o tamanho for \"SORTIDOS\" (com ou sem acento, espaços, etc.)\n    const tamanhoNormalizado = tamanho\n      .normalize(\"NFD\")\n      .replace(/[\\u0300-\\u036f]/g, '') // remove acentos\n      .toUpperCase();\n\n    if (tamanhoNormalizado === \"SORTIDOS\") continue;\n\n    for (const corItem of (tipo.colors ?? [])) {\n      const cor = (corItem.color?.name ?? \"\").trim();\n      const corId = corItem.color?.id ?? null;\n\n      const imageUrl =\n        corItem.color?.images?.[0]?.url ??\n        produto.thumbs?.[0]?.url ??\n        null;\n\n      const nomeProduto = `${nomeProdutoBase} - ${cor}`.replace(/\\s{2,}/g, ' ').trim();\n      const qtde = corItem.quantity ?? 0;\n\n      if (!mapaEstoque[nomeProduto]) {\n        mapaEstoque[nomeProduto] = {\n          id: corId,\n          url: imageUrl,\n          nomeProduto: nomeProduto,\n          quantity: 0,\n          available: produto.available ?? true,\n          amount: produto.amount ?? 0,\n          details: {\n            id: produto.details?.id,\n            brand: {\n              id: produto.details?.brand?.id,\n              name: produto.details?.brand?.name,\n              enable: produto.details?.brand?.enable\n            }\n          },\n          estoque: {},\n          tamanhosSet: new Set()\n        };\n      }\n\n      if (tamanho) {\n        mapaEstoque[nomeProduto].estoque[tamanho] =\n          (mapaEstoque[nomeProduto].estoque[tamanho] ?? 0) + qtde;\n        mapaEstoque[nomeProduto].quantity += qtde;\n\n        if (qtde > 0) {\n          mapaEstoque[nomeProduto].tamanhosSet.add(tamanho);\n        }\n      }\n    }\n  }\n\n  for (const itemFinal of Object.values(mapaEstoque)) {\n    for (const size of sizesRange) {\n      if (itemFinal.estoque[size] === undefined) {\n        itemFinal.estoque[size] = 0;\n      }\n    }\n\n    itemFinal.tamanhos = Array.from(itemFinal.tamanhosSet)\n      .sort((a, b) => parseInt(a) - parseInt(b))\n      .join(', ');\n\n    delete itemFinal.tamanhosSet;\n\n    result.push({ json: itemFinal });\n  }\n}\n\nreturn result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        -128
+      ],
+      "id": "af05dc20-c711-47aa-8e3c-f776e0f58b48",
+      "name": "Consolidar Dados"
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "nomeProduto",
+        "options": {
+          "removeOtherFields": false
+        }
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        -128
+      ],
+      "id": "a7d3ce4c-a784-46c1-ac58-e0dd1e713c5c",
+      "name": "Remover Duplicatas por Nome",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "estoque",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "ID",
+              "condition": "neq"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        48
+      ],
+      "id": "b5873e5d-ce4f-4d3f-9b14-12379ccd36be",
+      "name": "Zerar Estoque Anterior",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "EMjbzFOIRrE6PfUd",
+          "name": "Supabase Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1488,
+        48
+      ],
+      "id": "ca4c776b-fb58-4cf6-abd0-63f05f054f29",
+      "name": "Agendamento - Limpeza de Estoque (03h)",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1id6zmVnEbS5Ao_AfauMk_k-qeaWZaiEjNQbtzpN8Vqg",
+          "mode": "list",
+          "cachedResultName": "API Almeida",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1id6zmVnEbS5Ao_AfauMk_k-qeaWZaiEjNQbtzpN8Vqg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Página1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1id6zmVnEbS5Ao_AfauMk_k-qeaWZaiEjNQbtzpN8Vqg/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -816,
+        48
+      ],
+      "id": "03618a18-8a03-400a-b186-e026665acbe5",
+      "name": "Google Sheets",
+      "retryOnFail": false,
+      "executeOnce": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Rc5vUAtqn7HuC3gV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -160,
+        -128
+      ],
+      "id": "a37f6663-f3de-4fc7-8650-df92ab637a43",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b016b620-7422-46a7-a068-f316a2e5b4c6",
+              "leftValue": "={{ $json.API }}",
+              "rightValue": "=https://api.calcadosnt.com.br/",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -384,
+        48
+      ],
+      "id": "ce2b88b5-9f36-45ed-848a-af74260c9aae",
+      "name": "If",
+      "executeOnce": false,
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "errorMessage": "=❌ Erro na linha {{ $json.row_number }} da planilha [API ALMEIDA]: Verifique os dados informados. Campo obrigatório ausente, inválido ou estrutura incorreta.\n"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        288,
+        208
+      ],
+      "id": "32060c16-3264-4415-aadc-ee99746877d1",
+      "name": "Stop and Error",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        48
+      ],
+      "id": "e4d85423-e173-4844-aefa-12ec341b2646",
+      "name": "Remove Duplicates1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -1040,
+        48
+      ],
+      "id": "5418aaa6-faaf-47e8-a50f-4539304ae803",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c38ff7bc-73a5-4b1c-9a42-a8c6eefbd585",
+              "name": "=Etapa",
+              "value": "={{ $json.Classe }}",
+              "type": "string"
+            },
+            {
+              "id": "6f2e321d-faad-41aa-8a81-816ac81331d2",
+              "name": "numero_da_linha",
+              "value": "={{ $json.row_number }}",
+              "type": "string"
+            },
+            {
+              "id": "6f2a7e0a-4720-451b-a6ab-0e4170b0cc50",
+              "name": "=API INPUT",
+              "value": "={{ $json.API }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        208
+      ],
+      "id": "30c90666-01ea-4682-936b-2c08c4c4d78d",
+      "name": "Edit Fields",
+      "executeOnce": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "tableId": "logserrosautomacoes",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "etapa",
+              "fieldValue": "={{ $json.Etapa }}"
+            },
+            {
+              "fieldId": "origem",
+              "fieldValue": "=Estoque"
+            },
+            {
+              "fieldId": "fluxo de trabalho",
+              "fieldValue": "=Busca da API a relação de estoque "
+            },
+            {
+              "fieldId": "mensagemErro",
+              "fieldValue": "=Falha na comunicação com a API externa. A solicitação não pôde ser concluída com sucesso."
+            },
+            {
+              "fieldId": "numeroLinha",
+              "fieldValue": "={{ $json.numero_da_linha }}"
+            },
+            {
+              "fieldId": "entradaAPI",
+              "fieldValue": "={{ $json['API INPUT'] }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        64,
+        208
+      ],
+      "id": "acc8448d-d739-4372-b74b-3c91a560a6f2",
+      "name": "Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "EMjbzFOIRrE6PfUd",
+          "name": "Supabase Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Buscar Produtos da Categoria (API)": {
+      "main": [
+        [
+          {
+            "node": "Pré-processar Dados Brutos API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pré-processar Dados Brutos API": {
+      "main": [
+        [
+          {
+            "node": "Limpar e Padronizar Dados do Produto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpar e Padronizar Dados do Produto": {
+      "main": [
+        [
+          {
+            "node": "Buscar Detalhes Completos (API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Detalhes Completos (API)": {
+      "main": [
+        [
+          {
+            "node": "Consolidar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidar Dados": {
+      "main": [
+        [
+          {
+            "node": "Remover Duplicatas por Nome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remover Duplicatas por Nome": {
+      "main": [
+        [
+          {
+            "node": "Inserir Dados Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zerar Estoque Anterior": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendamento - Limpeza de Estoque (03h)": {
+      "main": [
+        [
+          {
+            "node": "Zerar Estoque Anterior",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Buscar Produtos da Categoria (API)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase": {
+      "main": [
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "67c131e39e0dbb46c94bdb74bef56a6ce70a37a3d8333872bda0d66c647144e9"
+  }
+}
