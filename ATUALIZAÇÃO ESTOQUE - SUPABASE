@@ -131,16 +131,16 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        1392,
-        -128
+        1488,
+        -192
       ],
-      "id": "c951deee-17fa-48e5-bb76-68d874f39ee5",
+      "id": "4fa9eb6b-b534-4efd-a725-329f6c188c79",
       "name": "Inserir Dados Supabase",
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "id": "EMjbzFOIRrE6PfUd",
-          "name": "Supabase Account"
+          "id": "ry8T0kPhnKQgNHIz",
+          "name": "Almeida Street"
         }
       }
     },
@@ -154,15 +154,15 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        64,
-        -128
+        160,
+        -192
       ],
-      "id": "4d5cc996-fb67-4858-b993-8b0ab3cf46bf",
+      "id": "7990daab-33a1-4cbc-b34c-b41b81257063",
       "name": "Buscar Produtos da Categoria (API)",
       "notesInFlow": false,
       "credentials": {
         "httpBasicAuth": {
-          "id": "FqHMDmVkyc7T67zy",
+          "id": "B64GrZo2Ulknlnz6",
           "name": "Credencial Site NT"
         }
       }
@@ -208,10 +208,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        288,
-        -128
+        384,
+        -192
       ],
-      "id": "695883c0-89aa-42d0-8773-09b2ca89e6c6",
+      "id": "9f929b93-c485-410a-8ee8-4785068dcb44",
       "name": "Pré-processar Dados Brutos API",
       "alwaysOutputData": false
     },
@@ -222,10 +222,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        512,
-        -128
+        608,
+        -192
       ],
-      "id": "169a80b6-ee4a-4044-87bc-07469ee84732",
+      "id": "78292017-fa43-46b3-a424-ff6450223be4",
       "name": "Limpar e Padronizar Dados do Produto"
     },
     {
@@ -238,17 +238,17 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        720,
-        -128
+        816,
+        -192
       ],
-      "id": "a2b8d72a-990a-44cd-b9a6-03dfeede5539",
+      "id": "b4a010d1-d96d-4623-b861-4bd7f3562785",
       "name": "Buscar Detalhes Completos (API)",
       "retryOnFail": true,
       "notesInFlow": false,
       "alwaysOutputData": false,
       "credentials": {
         "httpBasicAuth": {
-          "id": "FqHMDmVkyc7T67zy",
+          "id": "B64GrZo2Ulknlnz6",
           "name": "Credencial Site NT"
         }
       }
@@ -260,10 +260,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        944,
-        -128
+        1040,
+        -192
       ],
-      "id": "af05dc20-c711-47aa-8e3c-f776e0f58b48",
+      "id": "b76e987f-82a5-423b-ae60-d38dcc1ef2ad",
       "name": "Consolidar Dados"
     },
     {
@@ -277,10 +277,10 @@
       "type": "n8n-nodes-base.removeDuplicates",
       "typeVersion": 2,
       "position": [
-        1168,
-        -128
+        1264,
+        -192
       ],
-      "id": "a7d3ce4c-a784-46c1-ac58-e0dd1e713c5c",
+      "id": "d451637e-1d2d-42d7-8fd4-7ebeacb28b24",
       "name": "Remover Duplicatas por Nome",
       "executeOnce": false
     },
@@ -300,16 +300,16 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -1264,
-        48
+        -1168,
+        -16
       ],
-      "id": "b5873e5d-ce4f-4d3f-9b14-12379ccd36be",
+      "id": "2d92f694-3171-4b42-885d-ec0f413dd8df",
       "name": "Zerar Estoque Anterior",
       "alwaysOutputData": true,
       "credentials": {
         "supabaseApi": {
-          "id": "EMjbzFOIRrE6PfUd",
-          "name": "Supabase Account"
+          "id": "ry8T0kPhnKQgNHIz",
+          "name": "Almeida Street"
         }
       }
     },
@@ -326,10 +326,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        -1488,
-        48
+        -1392,
+        -16
       ],
-      "id": "ca4c776b-fb58-4cf6-abd0-63f05f054f29",
+      "id": "083cbeed-e58e-4870-89f1-b266edb991dc",
       "name": "Agendamento - Limpeza de Estoque (03h)",
       "notesInFlow": true
     },
@@ -354,16 +354,16 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.6,
       "position": [
-        -816,
-        48
+        -720,
+        -16
       ],
-      "id": "03618a18-8a03-400a-b186-e026665acbe5",
+      "id": "31a2ff53-18b9-48fe-a385-c13bc5d61e91",
       "name": "Google Sheets",
       "retryOnFail": false,
       "executeOnce": false,
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "Rc5vUAtqn7HuC3gV",
+          "id": "TNo6dIWjylUsI9sB",
           "name": "Google Sheets account"
         }
       }
@@ -375,10 +375,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -160,
-        -128
+        -64,
+        -192
       ],
-      "id": "a37f6663-f3de-4fc7-8650-df92ab637a43",
+      "id": "2f6bf7d4-edcf-4caa-aa75-7c6dbd723ba4",
       "name": "Loop Over Items"
     },
     {
@@ -409,10 +409,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -384,
-        48
+        -288,
+        -16
       ],
-      "id": "ce2b88b5-9f36-45ed-848a-af74260c9aae",
+      "id": "74a510b1-2258-45e4-bea6-b7333f7257a4",
       "name": "If",
       "executeOnce": false,
       "retryOnFail": true,
@@ -426,10 +426,10 @@
       "type": "n8n-nodes-base.stopAndError",
       "typeVersion": 1,
       "position": [
-        288,
-        208
+        384,
+        144
       ],
-      "id": "32060c16-3264-4415-aadc-ee99746877d1",
+      "id": "06203bc2-e917-4303-8f99-90dee39275aa",
       "name": "Stop and Error",
       "alwaysOutputData": true
     },
@@ -440,10 +440,10 @@
       "type": "n8n-nodes-base.removeDuplicates",
       "typeVersion": 2,
       "position": [
-        -608,
-        48
+        -512,
+        -16
       ],
-      "id": "e4d85423-e173-4844-aefa-12ec341b2646",
+      "id": "378094e0-f80c-4968-a668-d4b39a09c29c",
       "name": "Remove Duplicates1"
     },
     {
@@ -451,10 +451,10 @@
       "type": "n8n-nodes-base.limit",
       "typeVersion": 1,
       "position": [
-        -1040,
-        48
+        -944,
+        -16
       ],
-      "id": "5418aaa6-faaf-47e8-a50f-4539304ae803",
+      "id": "90243797-6dd3-4a5a-ae9f-1792f585ff31",
       "name": "Limit"
     },
     {
@@ -486,10 +486,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -160,
-        208
+        -64,
+        144
       ],
-      "id": "30c90666-01ea-4682-936b-2c08c4c4d78d",
+      "id": "823ec7b6-de0c-402d-9c72-dd258b9ca897",
       "name": "Edit Fields",
       "executeOnce": true,
       "alwaysOutputData": true
@@ -529,15 +529,15 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        64,
-        208
+        160,
+        144
       ],
-      "id": "acc8448d-d739-4372-b74b-3c91a560a6f2",
+      "id": "21288c6d-8688-4933-bcd5-a1a890c228c9",
       "name": "Supabase",
       "credentials": {
         "supabaseApi": {
-          "id": "EMjbzFOIRrE6PfUd",
-          "name": "Supabase Account"
+          "id": "ry8T0kPhnKQgNHIz",
+          "name": "Almeida Street"
         }
       }
     }
@@ -726,6 +726,6 @@
   "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "67c131e39e0dbb46c94bdb74bef56a6ce70a37a3d8333872bda0d66c647144e9"
+    "instanceId": "b34afefeccaafbecd055274ae7e23d91e7b424c24389ef44ab4220224cc053de"
   }
 }
