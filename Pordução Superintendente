@@ -1,0 +1,378 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        608,
+        -2288
+      ],
+      "id": "97ee67e2-14dd-4a44-8d31-b72ecd5b22c5",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1XKLqJN6whTwYKL54QNTFqt7MGdPfKyDho8Lr4VbrZoI",
+          "mode": "list",
+          "cachedResultName": "HIERARQUIA ALCIF",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XKLqJN6whTwYKL54QNTFqt7MGdPfKyDho8Lr4VbrZoI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1754143527,
+          "mode": "list",
+          "cachedResultName": "INDICADORES",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XKLqJN6whTwYKL54QNTFqt7MGdPfKyDho8Lr4VbrZoI/edit#gid=1754143527"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "id_superintendente",
+              "lookupValue": "={{ $json.id_superintendente }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1920,
+        -1936
+      ],
+      "id": "e988bbd6-5b53-4412-8246-a47148a540ec",
+      "name": "Get row(s) in sheet3",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TNo6dIWjylUsI9sB",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1648,
+        -1920
+      ],
+      "id": "2124e244-0e86-45ec-86cc-03acdb3ddd66",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        848,
+        -2048
+      ],
+      "id": "ce0f9625-88ab-4ca6-8227-b81c29530ffe",
+      "name": "Limit",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        -2048
+      ],
+      "id": "cf95189f-41a9-44e8-b0f4-48ebc43a295e",
+      "name": "Wait",
+      "webhookId": "52cfb1f8-e654-493d-bb50-5694392cc123"
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2352,
+        -1936
+      ],
+      "id": "d8e5a738-f94a-4555-afd3-57058dad07f1",
+      "name": "Wait1",
+      "webhookId": "664a60b5-d417-43c4-ab24-d2439062fe39"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        -2288
+      ],
+      "id": "200d7388-14db-4e5b-9021-71631177ea70",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "jsCode": "// IDs permitidos de superintendentes\nconst idsPermitidos = [11087, 15029, 16886];\n\n// Pega todos os itens de entrada\nconst items = $input.all();\n\n// Lista das colunas desejadas\nconst colunas = [\n  'id_superintendente',\n  'nome_superintendente',\n  'id_gerente_regional',\n  'nome_gerente_regional',\n  'id_supervisor',\n  'nome_supervisor',\n  'id_agente',\n  'nome_agente'\n];\n\n// Se não houver itens, retorna vazio\nif (items.length === 0) {\n  return [];\n}\n\n// Verifica se a planilha contém o campo id_superintendente\nconst temSuperintendente = Object.prototype.hasOwnProperty.call(items[0].json, 'id_superintendente');\n\n// Se tiver id_superintendente, aplica o filtro de IDs\nlet filtrados;\nif (temSuperintendente) {\n  filtrados = items.filter(item => idsPermitidos.includes(item.json.id_superintendente));\n} else {\n  // Se não tiver (tabela com id_agente), mantém todos\n  filtrados = items;\n}\n\n// Agora retorna apenas as colunas desejadas\nreturn filtrados.map(item => {\n  const novoJson = {};\n  for (const col of colunas) {\n    if (item.json[col] !== undefined) {\n      novoJson[col] = item.json[col];\n    }\n  }\n  return { json: novoJson };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        -2288
+      ],
+      "id": "8c3f20fa-065e-4471-8220-488a4de4aae3",
+      "name": "Filtro Superintendente"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega todos os itens de entrada\nconst items = $input.all();\n\n// Lista das colunas desejadas\nconst colunas = [\n  'id_superintendente',\n  'nome_superintendente',\n  'id_gerente_regional',\n  'nome_gerente_regional',\n  'id_supervisor',\n  'nome_supervisor',\n  'id_agente',\n  'nome_agente'\n];\n\n// Se não houver itens, retorna vazio\nif (items.length === 0) {\n  return [];\n}\n\n// Retorna apenas as colunas desejadas\nreturn items.map(item => {\n  const novoJson = {};\n  for (const col of colunas) {\n    if (item.json[col] !== undefined) {\n      novoJson[col] = item.json[col];\n    }\n  }\n  return { json: novoJson };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        -2464
+      ],
+      "id": "661bcf1d-ce52-405c-8423-39e5d8e1be78",
+      "name": "Filtro"
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "id_superintendente",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        608,
+        -2048
+      ],
+      "id": "8bc3b724-a70b-4a58-940e-0bd9a11df60e",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "jsCode": "// === CONFIGURAÇÕES ===\nconst now = new Date();\nconst mesAtual = String(now.getMonth() + 1).padStart(2, '0') + '-' + now.getFullYear();\n\n// === ENTRADA ===\nconst dados = $input.all().map(item => item.json);\nconst superintendentes = $('Loop Over Items3').all().map(i => i.json);\n\n// === FUNÇÕES AUXILIARES ===\nfunction parseValor(valor) {\n  if (!valor) return 0;\n  if (typeof valor === 'string') {\n    valor = valor.replace(',', '.');\n  }\n  const num = parseFloat(valor);\n  return isNaN(num) ? 0 : num; // <-- mantém decimal original\n}\n\nfunction getNomeSuper(id_superintendente) {\n  const match = superintendentes.find(s => s.id_superintendente == id_superintendente);\n  return match ? match.nome_superintendente : \"Sem Nome\";\n}\n\n// === Normalização de Mês/Ano ===\nfunction normalizaMesAno(mesAno) {\n  if (!mesAno) return null;\n  mesAno = mesAno.toString().trim().toLowerCase();\n  \n  if (/^\\d{2}-\\d{4}$/.test(mesAno)) {\n    return mesAno;\n  }\n  \n  const meses = {\n    'jan': '01', 'fev': '02', 'mar': '03', 'abr': '04',\n    'mai': '05', 'jun': '06', 'jul': '07', 'ago': '08',\n    'set': '09', 'out': '10', 'nov': '11', 'dez': '12'\n  };\n  \n  const match = mesAno.match(/([a-z]{3})/i);\n  if (match) {\n    const abrev = match[1].toLowerCase();\n    const mesNum = meses[abrev];\n    if (mesNum) {\n      const ano = now.getFullYear();\n      return `${mesNum}-${ano}`;\n    }\n  }\n  return null;\n}\n\n// === AGREGAÇÃO ===\nconst resultado = {};\n\nfor (const item of dados) {\n  const idSuper = item.id_superintendente;\n  const nomeSuper = getNomeSuper(idSuper);\n  const grupo = item.grupo_produto || \"N/D\";\n  const banco = item.id_banco || \"N/D\";\n  const tipo = item.tipo_producao || \"\";\n  const mes = normalizaMesAno(item.mes_ano);\n  \n  if (!resultado[idSuper]) {\n    resultado[idSuper] = {\n      nome_superintendente: nomeSuper,\n      mes_ano: mesAtual,\n      producao_total: 0,\n      projecao_total: 0,\n      grupos: {},\n      bancos: {}\n    };\n  }\n  \n  const valor = parseValor(item.vlr_producao);\n  \n  // PRODUÇÃO = tipo HISTORICA e mês atual\n  if (tipo.toUpperCase() === \"HISTORICA\" && mes === mesAtual) {\n    resultado[idSuper].producao_total += valor;\n    resultado[idSuper].grupos[grupo] = (resultado[idSuper].grupos[grupo] || 0) + valor;\n    resultado[idSuper].bancos[banco] = (resultado[idSuper].bancos[banco] || 0) + valor;\n  }\n  \n  // PROJEÇÃO = tipo PROJETADA\n  if (tipo.toUpperCase() === \"PROJETADA\") {\n    resultado[idSuper].projecao_total += valor;\n  }\n}\n\n// === Função para formatar removendo casas decimais e arredondando condicionalmente ===\nfunction formatarValor(valor) {\n  if (typeof valor !== 'number') valor = parseFloat(valor) || 0;\n\n  const parteDecimal = valor % 1;\n  const parteInteira = Math.floor(valor);\n\n  // 🔧 Defina aqui o limite a partir do qual arredonda pra cima\n  const LIMITE_ARREDONDAMENTO = 0.75;\n\n  const valorFinal = parteDecimal >= LIMITE_ARREDONDAMENTO\n    ? Math.ceil(valor)\n    : parteInteira;\n\n  // Retorna número inteiro formatado no padrão brasileiro\n  return valorFinal.toLocaleString('pt-BR', {\n    minimumFractionDigits: 0,\n    maximumFractionDigits: 0\n  });\n}\n\n// === ORDENA TOP 3 / BOTTOM 3 ===\nfunction topBottom(obj) {\n  const sorted = Object.entries(obj).sort((a, b) => b[1] - a[1]);\n  return {\n    top3: sorted.slice(0, 3).map(([k, v]) => `${k}: ${formatarValor(v)}`),\n    bottom3: sorted.slice(-3).map(([k, v]) => `${k}: ${formatarValor(v)}`)\n  };\n}\n\n// === SAÍDA FINAL ===\nconst saida = Object.values(resultado).map(r => {\n  const grupos = topBottom(r.grupos);\n  const bancos = topBottom(r.bancos);\n  \n  return {\n    nome_superintendente: r.nome_superintendente,\n    mes_ano: r.mes_ano,\n    producao_total: formatarValor(r.producao_total),\n    projecao_total: formatarValor(r.projecao_total),\n    top3_grupos: grupos.top3.join(' | '),\n    bottom3_grupos: grupos.bottom3.join(' | '),\n    top3_bancos: bancos.top3.join(' | ')\n  };\n});\n\nreturn saida.map(s => ({ json: s }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        -1936
+      ],
+      "id": "bc670dad-239b-46e6-bea8-2748ccde86ee",
+      "name": "Code6"
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        2576,
+        -1936
+      ],
+      "id": "dc9a04f6-ea6e-4a46-8cea-516f6a59c1b8",
+      "name": "Enviar texto1",
+      "credentials": {
+        "evolutionApi": {
+          "id": "Vt2MjiBepwghEZFo",
+          "name": "Evolution account"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1XKLqJN6whTwYKL54QNTFqt7MGdPfKyDho8Lr4VbrZoI",
+          "mode": "list",
+          "cachedResultName": "HIERARQUIA ALCIF",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XKLqJN6whTwYKL54QNTFqt7MGdPfKyDho8Lr4VbrZoI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "HIERARQUIA",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1XKLqJN6whTwYKL54QNTFqt7MGdPfKyDho8Lr4VbrZoI/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        848,
+        -2288
+      ],
+      "id": "a2c1d8e1-b59e-4284-b944-0f1aa9610a28",
+      "name": "HIERARQUIA",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "TNo6dIWjylUsI9sB",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HIERARQUIA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet3": {
+      "main": [
+        [
+          {
+            "node": "Code6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get row(s) in sheet3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Enviar texto1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing": {
+      "main": [
+        [
+          {
+            "node": "Filtro",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filtro Superintendente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro Superintendente": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro": {
+      "main": [
+        []
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code6": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar texto1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HIERARQUIA": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b34afefeccaafbecd055274ae7e23d91e7b424c24389ef44ab4220224cc053de"
+  }
+}
