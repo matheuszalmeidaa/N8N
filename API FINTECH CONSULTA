@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "url": "=https://api.anossafintech.com.br/inss/v1/operation?data_inicio={{ $json.data_inicio }}&data_fim={{ $json.data_fim }}&por_pagina=20000",
+        "url": "=https://api.anossafintech.com.br/inss/v1/operation?data_inicio={{ $json.data_inicio }}&data_fim={{ $json.data_fim }}&por_pagina=100000",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBearerAuth",
         "options": {}
@@ -10,29 +10,30 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        640,
-        -480
+        -400,
+        208
       ],
-      "id": "8a917213-7e7a-44d3-9043-5c71152bccee",
+      "id": "816f3f49-0472-4d69-a892-ac15433d2f6b",
       "name": "HTTP Request1",
       "credentials": {
         "httpBearerAuth": {
           "id": "gmhYkBMFG2KhX89K",
           "name": "Bearer Auth account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "const inicio = new Date(\"2025-03-18\");\n// data_fim = ontem\nconst hoje = new Date();\nconst limite = new Date();\nlimite.setDate(hoje.getDate() - 1);\nconst periodos = [];\nlet dataInicio = new Date(inicio);\n\nwhile (dataInicio <= limite) {\n  const dataFinal = new Date(dataInicio);\n  dataFinal.setDate(dataFinal.getDate() + 28);\n  // Ajuste se data_final ultrapassar ontem\n  const dataFinalCorrigida = dataFinal > limite ? limite : dataFinal;\n  periodos.push({\n    data_inicio: dataInicio.toISOString().split(\"T\")[0],\n    data_fim: dataFinalCorrigida.toISOString().split(\"T\")[0],\n  });\n  // Próximo intervalo começa no dia seguinte ao fim atual\n  const proximo = new Date(dataFinalCorrigida);\n  proximo.setDate(proximo.getDate() + 1);\n  dataInicio = proximo;\n}\n\nreturn periodos.map((p, index) => ({ \n  json: {\n    indice: index + 1,\n    ...p\n  }\n}));"
+        "jsCode": "const inicio = new Date(\"2025-03-18\");\n// data_fim = ontem\nconst hoje = new Date();\nconst limite = new Date();\nlimite.setDate(hoje.getDate() - 1);\nconst periodos = [];\nlet dataInicio = new Date(inicio);\n\nwhile (dataInicio <= limite) {\n  const dataFinal = new Date(dataInicio);\n  dataFinal.setDate(dataFinal.getDate() + 15);\n  // Ajuste se data_final ultrapassar ontem\n  const dataFinalCorrigida = dataFinal > limite ? limite : dataFinal;\n  periodos.push({\n    data_inicio: dataInicio.toISOString().split(\"T\")[0],\n    data_fim: dataFinalCorrigida.toISOString().split(\"T\")[0],\n  });\n  // Próximo intervalo começa no dia seguinte ao fim atual\n  const proximo = new Date(dataFinalCorrigida);\n  proximo.setDate(proximo.getDate() + 1);\n  dataInicio = proximo;\n}\n\nreturn periodos.map((p, index) => ({ \n  json: {\n    indice: index + 1,\n    ...p\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -32,
-        -408
+        -1056,
+        272
       ],
-      "id": "f20b8c4f-d233-4c31-bc59-08531bc28cc5",
+      "id": "768d37d7-b07f-407d-b904-caeab77b5c94",
       "name": "Code"
     },
     {
@@ -42,10 +43,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        416,
-        -408
+        -624,
+        272
       ],
-      "id": "2d2c90e5-df32-4708-a8bb-51f53f30d0c8",
+      "id": "9ccb36a6-e8a1-45d2-a135-3ac410468c68",
       "name": "Loop Over Items"
     },
     {
@@ -83,34 +84,23 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -256,
-        -408
+        -1280,
+        272
       ],
-      "id": "5bdb26c4-686d-47ca-bced-532bfe05681b",
+      "id": "669113c4-354c-417f-aa7d-5272cb91f3d5",
       "name": "Consulta Token"
     },
     {
       "parameters": {
-        "jsCode": "const operacoes = $json.operacoes;\n\nfunction formatarData(dataRaw) {\n  if (!dataRaw) return null;\n\n  const d = new Date(dataRaw);\n\n  const dia = String(d.getDate()).padStart(2, '0');\n  const mes = String(d.getMonth() + 1).padStart(2, '0');\n  const ano = d.getFullYear();\n\n  const hora = String(d.getHours()).padStart(2, '0');\n  const min = String(d.getMinutes()).padStart(2, '0');\n  const seg = String(d.getSeconds()).padStart(2, '0');\n\n  return {\n    data: `${dia}/${mes}/${ano}`,\n    hora: `${hora}:${min}:${seg}`,\n    completo: `${dia}/${mes}/${ano} ${hora}:${min}:${seg}`\n  };\n}\n\nreturn operacoes.map(op => {\n\n  const dataFormatada = formatarData(op.dat_emprestimo);\n\n  return {\n    json: {\n      cpf: op.cpf,\n      //dat_emprestimo_data: dataFormatada?.data,\n      //dat_emprestimo_hora: dataFormatada?.hora,\n      dat_emprestimo_completo: dataFormatada?.completo,\n\n      debt_key: op.debt_key,\n      credit_operation_key: op.credit_operation_key,\n      dsc_tipo_proposta_emprestimo: op.dsc_tipo_proposta_emprestimo,\n      dsc_situacao_emprestimo: op.dsc_situacao_emprestimo,\n      id: op.id,\n      nic_ctr_usuario: op.nic_ctr_usuario,\n      nom_cliente: op.nom_cliente,\n      num_contrato: op.num_contrato,\n      qtd_parcela: op.qtd_parcela,\n      val_liquido: op.val_liquido,\n      val_emissao: op.val_emissao,\n      link_nuvidio_invite: op.link_nuvidio_invite\n    }\n  };\n});"
+        "amount": 20
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        864,
-        -480
-      ],
-      "id": "a08118e8-1cd2-45ca-bdf6-b6c147725b24",
-      "name": "Code1"
-    },
-    {
-      "parameters": {},
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1088,
-        -336
+        192,
+        320
       ],
-      "id": "51c3bd73-8c9a-406f-aa1c-2396c61bc1be",
+      "id": "4a225a5b-9189-42e4-b8b2-b5a4e5e1a90e",
       "name": "Wait",
       "webhookId": "2d88fc3b-fd26-4191-8397-8825df48be9d"
     },
@@ -121,890 +111,34 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        1088,
-        -672
+        -160,
+        -112
       ],
-      "id": "f4f3b550-381a-4d13-bc12-76a74bd20e1a",
+      "id": "5e1cfff5-8b97-4775-8607-1756047cdf00",
       "name": "Loop Over Items1"
     },
     {
       "parameters": {
-        "jsCode": "// Pega todos os itens de entrada\nconst items = $input.all();\n\n// Array para armazenar todas as saídas\nconst allOutput = [];\n\n// Processa cada item de entrada\nitems.forEach(item => {\n  const inputData = item.json;\n  \n  // Extrai operation e histories\n  const operation = inputData.operation;\n  const histories = inputData.histories || [];\n  \n  // Se não houver histories, retorna a operation como está\n  if (histories.length === 0) {\n    allOutput.push({\n      json: {\n        ...operation,\n        history_id: null,\n        history_status: null,\n        history_description: null,\n        history_event_datetime: null,\n        history_credit_operation_key: null\n      }\n    });\n    return;\n  }\n  \n  // Cria uma linha para cada history\n  histories.forEach(history => {\n    allOutput.push({\n      json: {\n        // Dados da operation (prefixados para evitar conflito)\n        operation_id: operation.id,\n        debt_key: operation.debt_key,\n        link_form: operation.link_form,\n        ccb_pdf: operation.ccb_pdf,\n        benefit_number: operation.benefit_number,\n        ispb_number: operation.ispb_number,\n        branch_number: operation.branch_number,\n        account_type: operation.account_type,\n        account_number: operation.account_number,\n        account_digit: operation.account_digit,\n        pix_transfer_type: operation.pix_transfer_type,\n        pix_key: operation.pix_key,\n        num_proposta: operation.num_proposta,\n        num_contrato: operation.num_contrato,\n        dsc_tipo_proposta_emprestimo: operation.dsc_tipo_proposta_emprestimo,\n        cod_produto: operation.cod_produto,\n        cod_tabela: operation.cod_tabela,\n        dsc_produto: operation.dsc_produto,\n        interest_rate: operation.interest_rate,\n        dsc_situacao_emprestimo: operation.dsc_situacao_emprestimo,\n        dat_emprestimo: operation.dat_emprestimo,\n        nic_ctr_usuario: operation.nic_ctr_usuario,\n        cod_cpf_cliente: operation.cod_cpf_cliente,\n        nom_cliente: operation.nom_cliente,\n        email_cliente: operation.email_cliente,\n        dat_nascimento: operation.dat_nascimento,\n        nom_logradouro: operation.nom_logradouro,\n        num_predio: operation.num_predio,\n        nom_bairro: operation.nom_bairro,\n        sig_unidade_federacao: operation.sig_unidade_federacao,\n        cod_endrcmnt_pstl: operation.cod_endrcmnt_pstl,\n        dsc_cmplmnt_endrc: operation.dsc_cmplmnt_endrc,\n        nom_localidade: operation.nom_localidade,\n        num_telefone_celular: operation.num_telefone_celular,\n        nom_mae: operation.nom_mae,\n        qtd_parcela: operation.qtd_parcela,\n        val_liquido: operation.val_liquido,\n        dat_credito: operation.dat_credito,\n        promot_id: operation.promot_id,\n        key_bilhete_seguro: operation.key_bilhete_seguro,\n        link_nuvidio_invite: operation.link_nuvidio_invite,\n        link_bilhete_seguro: operation.link_bilhete_seguro,\n        email_master: operation.email_master,\n        link_cmp_pgmt: operation.link_cmp_pgmt,\n        has_insurance: operation.has_insurance,\n        val_seguro: operation.val_seguro,\n        val_emissao: operation.val_emissao,\n        marital_status: operation.marital_status,\n        related_party_key: operation.related_party_key,\n        first_installment_value: operation.first_installment_value,\n        first_installment_date: operation.first_installment_date,\n        credit_operation_key: operation.credit_operation_key,\n        process_id: operation.process_id,\n        unico_score: operation.unico_score,\n        serpro_score: operation.serpro_score,\n        credit_type: operation.credit_type,\n        assistance_type: operation.assistance_type,\n        balance_request_info: operation.balance_request_info,\n        benefit_state: operation.benefit_state,\n        legal_representative: operation.legal_representative,\n        created_at: operation.created_at,\n        modified_at: operation.modified_at,\n        policy_number: operation.policy_number,\n        in100: operation.in100,\n        purchaser: operation.purchaser,\n        op_stage_id: operation.op_stage_id,\n        requester_identifier_key: operation.requester_identifier_key,\n        bank_name: operation.bank_name,\n        \n        // Dados do history\n        history_id: history.id,\n        history_debt_key: history.debt_key,\n        history_credit_operation_key: history.credit_operation_key,\n        history_status: history.status,\n        history_description: history.description,\n        history_event_datetime: history.event_datetime\n      }\n    });\n  });\n});\n\n// Retorna todos os itens processados\nreturn allOutput;"
+        "jsCode": "// Pega o item principal\nconst item = $('Loop Over Items1').first()?.json || {};\nconst op = $input.first()?.json?.operation || {};\n\nreturn {\n  json: {\n    cpf: item.cpf ?? op.cpf ?? null,\n    dat_emprestimo_completo: item.dat_emprestimo_completo ?? op.dat_emprestimo_completo ?? null,\n    debt_key: item.debt_key ?? op.debt_key ?? null,\n    dsc_tipo_proposta_emprestimo: item.dsc_tipo_proposta_emprestimo ?? op.dsc_tipo_proposta_emprestimo ?? null,\n    dsc_situacao_emprestimo: item.dsc_situacao_emprestimo ?? op.dsc_situacao_emprestimo ?? null,\n    id: item.id ?? op.id ?? null,\n    nic_ctr_usuario: item.nic_ctr_usuario ?? op.nic_ctr_usuario ?? null,\n    nom_cliente: item.nom_cliente ?? op.nom_cliente ?? null,\n    num_contrato: item.num_contrato ?? op.num_contrato ?? null,\n    qtd_parcela: item.qtd_parcela ?? op.qtd_parcela ?? null,\n    val_liquido: item.val_liquido ?? op.val_liquido ?? null,\n    val_emissao: item.val_emissao ?? op.val_emissao ?? null,\n\n    // CAMPOS NOVOS DO OPERATION\n    dat_credito: item.dat_credito ?? op.dat_credito ?? null,\n    link_cmp_pgmt: item.link_cmp_pgmt ?? op.link_cmp_pgmt ?? null,\n    has_insurance: item.has_insurance ?? op.has_insurance ?? null,\n    val_seguro: item.val_seguro ?? op.val_seguro ?? null,\n    marital_status: item.marital_status ?? op.marital_status ?? null,\n    related_party_key: item.related_party_key ?? op.related_party_key ?? null,\n    first_installment_value: item.first_installment_value ?? op.first_installment_value ?? null,\n    first_installment_date: item.first_installment_date ?? op.first_installment_date ?? null,\n    credit_operation_key: item.credit_operation_key ?? op.credit_operation_key ?? null,\n    process_id: item.process_id ?? op.process_id ?? null,\n    unico_score: item.unico_score ?? op.unico_score ?? null,\n    serpro_score: item.serpro_score ?? op.serpro_score ?? null,\n    credit_type: item.credit_type ?? op.credit_type ?? null,\n    assistance_type: item.assistance_type ?? op.assistance_type ?? null,\n    balance_request_info: item.balance_request_info ?? op.balance_request_info ?? null,\n    benefit_state: item.benefit_state ?? op.benefit_state ?? null,\n    legal_representative: item.legal_representative ?? op.legal_representative ?? null,\n    created_at: item.created_at ?? op.created_at ?? null,\n    modified_at: item.modified_at ?? op.modified_at ?? null,\n    policy_number: item.policy_number ?? op.policy_number ?? null,\n    in100: item.in100 ?? op.in100 ?? null,\n    purchaser: item.purchaser ?? op.purchaser ?? null,\n    op_stage_id: item.op_stage_id ?? op.op_stage_id ?? null,\n    requester_identifier_key: item.requester_identifier_key ?? op.requester_identifier_key ?? null,\n    bank_name: item.bank_name ?? op.bank_name ?? null,\n  }\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1536,
-        -504
+        848,
+        -48
       ],
-      "id": "1edd9747-2a3c-44b5-8b11-35f65cb3383d",
+      "id": "91eae9ec-cf46-4d2a-9770-1e039172c30a",
       "name": "Code2"
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "1lsNG1FbdQyXYLXLOqtEQa0VmSWI1HXxpSlwJv5qpU84",
-          "mode": "list",
-          "cachedResultName": "API FINTECH EXEMPLO DE FOMATAÇÃO",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lsNG1FbdQyXYLXLOqtEQa0VmSWI1HXxpSlwJv5qpU84/edit?usp=drivesdk"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": 1237318465,
-          "mode": "list",
-          "cachedResultName": "N8N",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lsNG1FbdQyXYLXLOqtEQa0VmSWI1HXxpSlwJv5qpU84/edit#gid=1237318465"
-        },
-        "columns": {
-          "mappingMode": "autoMapInputData",
-          "value": {},
-          "matchingColumns": [
-            "id",
-            "id"
-          ],
-          "schema": [
-            {
-              "id": "operation_id",
-              "displayName": "operation_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "debt_key",
-              "displayName": "debt_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "link_form",
-              "displayName": "link_form",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "ccb_pdf",
-              "displayName": "ccb_pdf",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "benefit_number",
-              "displayName": "benefit_number",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "ispb_number",
-              "displayName": "ispb_number",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "branch_number",
-              "displayName": "branch_number",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "account_type",
-              "displayName": "account_type",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "account_number",
-              "displayName": "account_number",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "account_digit",
-              "displayName": "account_digit",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "pix_transfer_type",
-              "displayName": "pix_transfer_type",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "pix_key",
-              "displayName": "pix_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "num_proposta",
-              "displayName": "num_proposta",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "num_contrato",
-              "displayName": "num_contrato",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "dsc_tipo_proposta_emprestimo",
-              "displayName": "dsc_tipo_proposta_emprestimo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "cod_produto",
-              "displayName": "cod_produto",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "cod_tabela",
-              "displayName": "cod_tabela",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "dsc_produto",
-              "displayName": "dsc_produto",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "interest_rate",
-              "displayName": "interest_rate",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "dsc_situacao_emprestimo",
-              "displayName": "dsc_situacao_emprestimo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "dat_emprestimo",
-              "displayName": "dat_emprestimo",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "nic_ctr_usuario",
-              "displayName": "nic_ctr_usuario",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "cod_cpf_cliente",
-              "displayName": "cod_cpf_cliente",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "nom_cliente",
-              "displayName": "nom_cliente",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "email_cliente",
-              "displayName": "email_cliente",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "dat_nascimento",
-              "displayName": "dat_nascimento",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "nom_logradouro",
-              "displayName": "nom_logradouro",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "num_predio",
-              "displayName": "num_predio",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "nom_bairro",
-              "displayName": "nom_bairro",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "sig_unidade_federacao",
-              "displayName": "sig_unidade_federacao",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "cod_endrcmnt_pstl",
-              "displayName": "cod_endrcmnt_pstl",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "dsc_cmplmnt_endrc",
-              "displayName": "dsc_cmplmnt_endrc",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "nom_localidade",
-              "displayName": "nom_localidade",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "num_telefone_celular",
-              "displayName": "num_telefone_celular",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "nom_mae",
-              "displayName": "nom_mae",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "qtd_parcela",
-              "displayName": "qtd_parcela",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "val_liquido",
-              "displayName": "val_liquido",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "dat_credito",
-              "displayName": "dat_credito",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "promot_id",
-              "displayName": "promot_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "key_bilhete_seguro",
-              "displayName": "key_bilhete_seguro",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "link_nuvidio_invite",
-              "displayName": "link_nuvidio_invite",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "link_bilhete_seguro",
-              "displayName": "link_bilhete_seguro",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "email_master",
-              "displayName": "email_master",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "link_cmp_pgmt",
-              "displayName": "link_cmp_pgmt",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "has_insurance",
-              "displayName": "has_insurance",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "val_seguro",
-              "displayName": "val_seguro",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "val_emissao",
-              "displayName": "val_emissao",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "marital_status",
-              "displayName": "marital_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "related_party_key",
-              "displayName": "related_party_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "first_installment_value",
-              "displayName": "first_installment_value",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "first_installment_date",
-              "displayName": "first_installment_date",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "credit_operation_key",
-              "displayName": "credit_operation_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "process_id",
-              "displayName": "process_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "unico_score",
-              "displayName": "unico_score",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "serpro_score",
-              "displayName": "serpro_score",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "credit_type",
-              "displayName": "credit_type",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "assistance_type",
-              "displayName": "assistance_type",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "balance_request_info",
-              "displayName": "balance_request_info",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "benefit_state",
-              "displayName": "benefit_state",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "legal_representative",
-              "displayName": "legal_representative",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "modified_at",
-              "displayName": "modified_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "policy_number",
-              "displayName": "policy_number",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "in100",
-              "displayName": "in100",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "purchaser",
-              "displayName": "purchaser",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "op_stage_id",
-              "displayName": "op_stage_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "requester_identifier_key",
-              "displayName": "requester_identifier_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "bank_name",
-              "displayName": "bank_name",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "debt_key",
-              "displayName": "debt_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "credit_operation_key",
-              "displayName": "credit_operation_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "description",
-              "displayName": "description",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "event_datetime",
-              "displayName": "event_datetime",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "operation_id",
-              "displayName": "operation_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "history_id",
-              "displayName": "history_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "history_debt_key",
-              "displayName": "history_debt_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "history_credit_operation_key",
-              "displayName": "history_credit_operation_key",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "history_status",
-              "displayName": "history_status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "history_description",
-              "displayName": "history_description",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "history_event_datetime",
-              "displayName": "history_event_datetime",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        1312,
-        -768
-      ],
-      "id": "b0eed22d-6f9a-4d41-acc7-9496ff924062",
-      "name": "Append row in sheet",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "TNo6dIWjylUsI9sB",
-          "name": "Google Sheets account"
-        }
-      }
     },
     {
       "parameters": {},
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -480,
-        -408
+        -1504,
+        272
       ],
-      "id": "7b680a8b-c0a6-42f8-89d4-f13e1c11f40b",
+      "id": "93c96456-53db-4644-94a8-f1187b05e629",
       "name": "When clicking ‘Execute workflow’"
     },
     {
@@ -1017,43 +151,85 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1312,
-        -576
+        96,
+        -96
       ],
-      "id": "dee3dc6e-5de4-438c-a2a9-31d4aedbc514",
+      "id": "3cabb9ee-394c-4ff1-8657-9437a5660ce8",
       "name": "HTTP Request",
       "credentials": {
         "httpBearerAuth": {
           "id": "gmhYkBMFG2KhX89K",
           "name": "Bearer Auth account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {},
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        640,
-        -672
+        -400,
+        -112
       ],
-      "id": "2c546fb1-e0d5-4007-bae8-183643641a5e",
+      "id": "6e5ea255-def4-4a0f-805f-acd990d4b452",
       "name": "Wait1",
       "webhookId": "48fcf39a-c2e7-4da9-ae22-123ff2f53203"
     },
     {
       "parameters": {
-        "maxItems": 3
+        "binaryPropertyName": "json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        -320
+      ],
+      "id": "5b3b2a90-0a60-43ae-8e27-382d64a7bc06",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const operacoes = $json.operacoes;\n\nfunction formatarData(dataRaw) {\n  if (!dataRaw) return null;\n\n  const d = new Date(dataRaw);\n\n  const dia = String(d.getDate()).padStart(2, '0');\n  const mes = String(d.getMonth() + 1).padStart(2, '0');\n  const ano = d.getFullYear();\n\n  const hora = String(d.getHours()).padStart(2, '0');\n  const min = String(d.getMinutes()).padStart(2, '0');\n  const seg = String(d.getSeconds()).padStart(2, '0');\n\n  return {\n    data: `${dia}/${mes}/${ano}`,\n    hora: `${hora}:${min}:${seg}`,\n    completo: `${dia}/${mes}/${ano} ${hora}:${min}:${seg}`\n  };\n}\n\nreturn operacoes.map(op => {\n\n  const dataFormatada = formatarData(op.dat_emprestimo);\n\n  return {\n    json: {\n      cpf: op.cpf,\n      //dat_emprestimo_data: dataFormatada?.data,\n      //dat_emprestimo_hora: dataFormatada?.hora,\n      dat_emprestimo_completo: dataFormatada?.completo,\n\n      debt_key: op.debt_key,\n      credit_operation_key: op.credit_operation_key,\n      dsc_tipo_proposta_emprestimo: op.dsc_tipo_proposta_emprestimo,\n      dsc_situacao_emprestimo: op.dsc_situacao_emprestimo,\n      id: op.id,\n      nic_ctr_usuario: op.nic_ctr_usuario,\n      nom_cliente: op.nom_cliente,\n      num_contrato: op.num_contrato,\n      qtd_parcela: op.qtd_parcela,\n      val_liquido: op.val_liquido,\n      val_emissao: op.val_emissao,\n      link_nuvidio_invite: op.link_nuvidio_invite\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        192
+      ],
+      "id": "e9afa982-7a1a-4feb-a9f9-f8ce504d5747",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "maxItems": 10,
+        "keep": "lastItems"
       },
       "type": "n8n-nodes-base.limit",
       "typeVersion": 1,
       "position": [
-        864,
-        -672
+        -864,
+        272
       ],
-      "id": "dc7720f7-b869-48b0-8415-db6e27828b61",
-      "name": "Limit1",
-      "disabled": true
+      "id": "4f7101ee-178f-4e69-b992-8cde0b4e948d",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        -144
+      ],
+      "id": "3d79b206-e88b-49a8-bf0b-01725e0ae0ae",
+      "name": "Wait2",
+      "webhookId": "fad9ca4b-64e8-4b1d-b3f9-4f5043eb17e1"
     }
   ],
   "connections": {
@@ -1065,6 +241,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1072,7 +255,7 @@
       "main": [
         [
           {
-            "node": "Loop Over Items",
+            "node": "Limit",
             "type": "main",
             "index": 0
           }
@@ -1108,17 +291,6 @@
         ]
       ]
     },
-    "Code1": {
-      "main": [
-        [
-          {
-            "node": "Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Wait": {
       "main": [
         [
@@ -1134,7 +306,7 @@
       "main": [
         [
           {
-            "node": "Append row in sheet",
+            "node": "Convert to File",
             "type": "main",
             "index": 0
           }
@@ -1174,7 +346,14 @@
       "main": [
         [
           {
-            "node": "Code2",
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items1",
             "type": "main",
             "index": 0
           }
@@ -1185,18 +364,40 @@
       "main": [
         [
           {
-            "node": "Limit1",
+            "node": "Loop Over Items1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Limit1": {
+    "Code1": {
       "main": [
         [
           {
-            "node": "Loop Over Items1",
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "Code2",
             "type": "main",
             "index": 0
           }
@@ -1204,7 +405,11 @@
       ]
     }
   },
-  "pinData": {},
+  "pinData": {
+    "When clicking ‘Execute workflow’": [
+      {}
+    ]
+  },
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "b34afefeccaafbecd055274ae7e23d91e7b424c24389ef44ab4220224cc053de"
