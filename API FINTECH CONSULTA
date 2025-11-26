@@ -2,7 +2,7 @@
   "nodes": [
     {
       "parameters": {
-        "url": "=https://api.anossafintech.com.br/inss/v1/operation?data_inicio={{ $json.data_inicio }}&data_fim={{ $json.data_fim }}&por_pagina=100000",
+        "url": "=https://api.anossafintech.com.br/inss/v1/operation?data_inicio={{ $json.data_inicio }}&data_fim={{ $json.data_fim }}&por_pagina=200000",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBearerAuth",
         "options": {}
@@ -10,11 +10,12 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -400,
-        208
+        -384,
+        160
       ],
       "id": "816f3f49-0472-4d69-a892-ac15433d2f6b",
       "name": "HTTP Request1",
+      "executeOnce": false,
       "credentials": {
         "httpBearerAuth": {
           "id": "gmhYkBMFG2KhX89K",
@@ -25,29 +26,16 @@
     },
     {
       "parameters": {
-        "jsCode": "const inicio = new Date(\"2025-03-18\");\n// data_fim = ontem\nconst hoje = new Date();\nconst limite = new Date();\nlimite.setDate(hoje.getDate() - 1);\nconst periodos = [];\nlet dataInicio = new Date(inicio);\n\nwhile (dataInicio <= limite) {\n  const dataFinal = new Date(dataInicio);\n  dataFinal.setDate(dataFinal.getDate() + 15);\n  // Ajuste se data_final ultrapassar ontem\n  const dataFinalCorrigida = dataFinal > limite ? limite : dataFinal;\n  periodos.push({\n    data_inicio: dataInicio.toISOString().split(\"T\")[0],\n    data_fim: dataFinalCorrigida.toISOString().split(\"T\")[0],\n  });\n  // Próximo intervalo começa no dia seguinte ao fim atual\n  const proximo = new Date(dataFinalCorrigida);\n  proximo.setDate(proximo.getDate() + 1);\n  dataInicio = proximo;\n}\n\nreturn periodos.map((p, index) => ({ \n  json: {\n    indice: index + 1,\n    ...p\n  }\n}));"
+        "jsCode": "const inicio = new Date(\"2025-03-18\");\n// data_fim = ontem\nconst hoje = new Date();\nconst limite = new Date();\nlimite.setDate(hoje.getDate() - 1);\nconst periodos = [];\nlet dataInicio = new Date(inicio);\n\nwhile (dataInicio <= limite) {\n  const dataFinal = new Date(dataInicio);\n  dataFinal.setDate(dataFinal.getDate() + 1);\n  // Ajuste se data_final ultrapassar ontem\n  const dataFinalCorrigida = dataFinal > limite ? limite : dataFinal;\n  periodos.push({\n    data_inicio: dataInicio.toISOString().split(\"T\")[0],\n    data_fim: dataFinalCorrigida.toISOString().split(\"T\")[0],\n  });\n  // Próximo intervalo começa no dia seguinte ao fim atual\n  const proximo = new Date(dataFinalCorrigida);\n  proximo.setDate(proximo.getDate() + 1);\n  dataInicio = proximo;\n}\n\nreturn periodos.map((p, index) => ({ \n  json: {\n    indice: index + 1,\n    ...p\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         -1056,
-        272
+        160
       ],
       "id": "768d37d7-b07f-407d-b904-caeab77b5c94",
       "name": "Code"
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        -624,
-        272
-      ],
-      "id": "9ccb36a6-e8a1-45d2-a135-3ac410468c68",
-      "name": "Loop Over Items"
     },
     {
       "parameters": {
@@ -67,7 +55,7 @@
           "parameters": [
             {
               "name": "cpf",
-              "value": "86046668506"
+              "value": "05134108560"
             },
             {
               "name": "promot_id",
@@ -75,7 +63,7 @@
             },
             {
               "name": "password",
-              "value": "Nossa2025*"
+              "value": "Alcif@2026"
             }
           ]
         },
@@ -85,24 +73,10 @@
       "typeVersion": 4.2,
       "position": [
         -1280,
-        272
+        160
       ],
       "id": "669113c4-354c-417f-aa7d-5272cb91f3d5",
       "name": "Consulta Token"
-    },
-    {
-      "parameters": {
-        "amount": 20
-      },
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        192,
-        320
-      ],
-      "id": "4a225a5b-9189-42e4-b8b2-b5a4e5e1a90e",
-      "name": "Wait",
-      "webhookId": "2d88fc3b-fd26-4191-8397-8825df48be9d"
     },
     {
       "parameters": {
@@ -112,23 +86,24 @@
       "typeVersion": 3,
       "position": [
         -160,
-        -112
+        -128
       ],
       "id": "5e1cfff5-8b97-4775-8607-1756047cdf00",
       "name": "Loop Over Items1"
     },
     {
       "parameters": {
-        "jsCode": "// Pega o item principal\nconst item = $('Loop Over Items1').first()?.json || {};\nconst op = $input.first()?.json?.operation || {};\n\nreturn {\n  json: {\n    cpf: item.cpf ?? op.cpf ?? null,\n    dat_emprestimo_completo: item.dat_emprestimo_completo ?? op.dat_emprestimo_completo ?? null,\n    debt_key: item.debt_key ?? op.debt_key ?? null,\n    dsc_tipo_proposta_emprestimo: item.dsc_tipo_proposta_emprestimo ?? op.dsc_tipo_proposta_emprestimo ?? null,\n    dsc_situacao_emprestimo: item.dsc_situacao_emprestimo ?? op.dsc_situacao_emprestimo ?? null,\n    id: item.id ?? op.id ?? null,\n    nic_ctr_usuario: item.nic_ctr_usuario ?? op.nic_ctr_usuario ?? null,\n    nom_cliente: item.nom_cliente ?? op.nom_cliente ?? null,\n    num_contrato: item.num_contrato ?? op.num_contrato ?? null,\n    qtd_parcela: item.qtd_parcela ?? op.qtd_parcela ?? null,\n    val_liquido: item.val_liquido ?? op.val_liquido ?? null,\n    val_emissao: item.val_emissao ?? op.val_emissao ?? null,\n\n    // CAMPOS NOVOS DO OPERATION\n    dat_credito: item.dat_credito ?? op.dat_credito ?? null,\n    link_cmp_pgmt: item.link_cmp_pgmt ?? op.link_cmp_pgmt ?? null,\n    has_insurance: item.has_insurance ?? op.has_insurance ?? null,\n    val_seguro: item.val_seguro ?? op.val_seguro ?? null,\n    marital_status: item.marital_status ?? op.marital_status ?? null,\n    related_party_key: item.related_party_key ?? op.related_party_key ?? null,\n    first_installment_value: item.first_installment_value ?? op.first_installment_value ?? null,\n    first_installment_date: item.first_installment_date ?? op.first_installment_date ?? null,\n    credit_operation_key: item.credit_operation_key ?? op.credit_operation_key ?? null,\n    process_id: item.process_id ?? op.process_id ?? null,\n    unico_score: item.unico_score ?? op.unico_score ?? null,\n    serpro_score: item.serpro_score ?? op.serpro_score ?? null,\n    credit_type: item.credit_type ?? op.credit_type ?? null,\n    assistance_type: item.assistance_type ?? op.assistance_type ?? null,\n    balance_request_info: item.balance_request_info ?? op.balance_request_info ?? null,\n    benefit_state: item.benefit_state ?? op.benefit_state ?? null,\n    legal_representative: item.legal_representative ?? op.legal_representative ?? null,\n    created_at: item.created_at ?? op.created_at ?? null,\n    modified_at: item.modified_at ?? op.modified_at ?? null,\n    policy_number: item.policy_number ?? op.policy_number ?? null,\n    in100: item.in100 ?? op.in100 ?? null,\n    purchaser: item.purchaser ?? op.purchaser ?? null,\n    op_stage_id: item.op_stage_id ?? op.op_stage_id ?? null,\n    requester_identifier_key: item.requester_identifier_key ?? op.requester_identifier_key ?? null,\n    bank_name: item.bank_name ?? op.bank_name ?? null,\n  }\n}\n"
+        "jsCode": "// Item principal do loop\nconst item = $('Loop Over Items1').first()?.json || {};\n\n// Dados da operação (caso existam)\nconst op = $input.first()?.json?.operation || {};\n\n// Captura histories independente do local\nconst histories =\n  Array.isArray($input.first()?.json?.operation?.histories)\n    ? $input.first().json.operation.histories\n    : Array.isArray($input.first()?.json?.histories)\n      ? $input.first().json.histories\n      : [];\n\n// Função para montar o registro\nfunction montarRegistro(base, hist = null, totalHist = 0) {\n  return {\n    json: {\n      // CAMPOS EXISTENTES\n      cpf: item.cpf ?? base.cpf ?? null,\n      dat_emprestimo_completo: item.dat_emprestimo_completo ?? base.dat_emprestimo_completo ?? null,\n      debt_key: item.debt_key ?? base.debt_key ?? null,\n      dsc_tipo_proposta_emprestimo: item.dsc_tipo_proposta_emprestimo ?? base.dsc_tipo_proposta_emprestimo ?? null,\n      dsc_situacao_emprestimo: item.dsc_situacao_emprestimo ?? base.dsc_situacao_emprestimo ?? null,\n      id: item.id ?? base.id ?? null,\n      nic_ctr_usuario: item.nic_ctr_usuario ?? base.nic_ctr_usuario ?? null,\n      nom_cliente: item.nom_cliente ?? base.nom_cliente ?? null,\n      num_contrato: item.num_contrato ?? base.num_contrato ?? null,\n      qtd_parcela: item.qtd_parcela ?? base.qtd_parcela ?? null,\n      val_liquido: item.val_liquido ?? base.val_liquido ?? null,\n      val_emissao: item.val_emissao ?? base.val_emissao ?? null,\n\n      // CAMPOS NOVOS DO OPERATION\n      dat_credito: item.dat_credito ?? base.dat_credito ?? null,\n      link_cmp_pgmt: item.link_cmp_pgmt ?? base.link_cmp_pgmt ?? null,\n      has_insurance: item.has_insurance ?? base.has_insurance ?? null,\n      val_seguro: item.val_seguro ?? base.val_seguro ?? null,\n      marital_status: item.marital_status ?? base.marital_status ?? null,\n      related_party_key: item.related_party_key ?? base.related_party_key ?? null,\n      first_installment_value: item.first_installment_value ?? base.first_installment_value ?? null,\n      first_installment_date: item.first_installment_date ?? base.first_installment_date ?? null,\n      credit_operation_key: item.credit_operation_key ?? base.credit_operation_key ?? null,\n      process_id: item.process_id ?? base.process_id ?? null,\n      unico_score: item.unico_score ?? base.unico_score ?? null,\n      serpro_score: item.serpro_score ?? base.serpro_score ?? null,\n      credit_type: item.credit_type ?? base.credit_type ?? null,\n      assistance_type: item.assistance_type ?? base.assistance_type ?? null,\n      balance_request_info: item.balance_request_info ?? base.balance_request_info ?? null,\n      benefit_state: item.benefit_state ?? base.benefit_state ?? null,\n      legal_representative: item.legal_representative ?? base.legal_representative ?? null,\n      created_at: item.created_at ?? base.created_at ?? null,\n      modified_at: item.modified_at ?? base.modified_at ?? null,\n      policy_number: item.policy_number ?? base.policy_number ?? null,\n      in100: item.in100 ?? base.in100 ?? null,\n      purchaser: item.purchaser ?? base.purchaser ?? null,\n      op_stage_id: item.op_stage_id ?? base.op_stage_id ?? null,\n      requester_identifier_key: item.requester_identifier_key ?? base.requester_identifier_key ?? null,\n      bank_name: item.bank_name ?? base.bank_name ?? null,\n\n      // CAMPOS DO HISTÓRICO\n      historico_id: hist?.id ?? null,\n      historico_debt_key: hist?.debt_key ?? null,\n      historico_credit_operation_key: hist?.credit_operation_key ?? null,\n      historico_status: hist?.status ?? null,\n      historico_description: hist?.description ?? null,\n      historico_event_datetime: hist?.event_datetime ?? null,\n\n      //quantidade_historicos: totalHist\n    }\n  };\n}\n\n// ----------------------------------------------------\n// SE TEM HISTÓRICOS → GERA UMA LINHA POR HISTÓRICO\n// ----------------------------------------------------\nif (histories.length > 0) {\n  return histories.map(h => montarRegistro(op, h, histories.length));\n}\n\n// ----------------------------------------------------\n// NÃO TEM HISTÓRICO → APENAS 1 LINHA\n// ----------------------------------------------------\nreturn [ montarRegistro(op, null, 0) ];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        848,
-        -48
+        288,
+        -128
       ],
       "id": "91eae9ec-cf46-4d2a-9770-1e039172c30a",
-      "name": "Code2"
+      "name": "Code2",
+      "alwaysOutputData": true
     },
     {
       "parameters": {},
@@ -136,7 +111,7 @@
       "typeVersion": 1,
       "position": [
         -1504,
-        272
+        160
       ],
       "id": "93c96456-53db-4644-94a8-f1187b05e629",
       "name": "When clicking ‘Execute workflow’"
@@ -151,8 +126,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        96,
-        -96
+        64,
+        -128
       ],
       "id": "3cabb9ee-394c-4ff1-8657-9437a5660ce8",
       "name": "HTTP Request",
@@ -169,8 +144,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        -400,
-        -112
+        -384,
+        -128
       ],
       "id": "6e5ea255-def4-4a0f-805f-acd990d4b452",
       "name": "Wait1",
@@ -184,7 +159,7 @@
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
       "position": [
-        48,
+        64,
         -320
       ],
       "id": "5b3b2a90-0a60-43ae-8e27-382d64a7bc06",
@@ -197,39 +172,104 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -96,
-        192
+        -160,
+        160
       ],
       "id": "e9afa982-7a1a-4feb-a9f9-f8ce504d5747",
-      "name": "Code1"
+      "name": "Code1",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
-        "maxItems": 10,
-        "keep": "lastItems"
+        "protocol": "sftp",
+        "operation": "upload",
+        "path": "/root/Debitos/File.csv"
       },
+      "type": "n8n-nodes-base.ftp",
+      "typeVersion": 1,
+      "position": [
+        288,
+        -320
+      ],
+      "id": "32b66ee0-add0-47af-8818-f5d6da55badf",
+      "name": "FTP",
+      "credentials": {
+        "sftp": {
+          "id": "YRJ30X3lRMVmm1yy",
+          "name": "FTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "Matheus",
+        "remoteJid": "5573998112304",
+        "messageText": "API Fintech🚀🏦\nRodou com sucesso e o arquivo já foi adicionado ao nosso FileZilla ✅",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        512,
+        -320
+      ],
+      "id": "9ce25cfb-9b2a-40b7-8c95-b03688f2951d",
+      "name": "Enviar texto",
+      "credentials": {
+        "evolutionApi": {
+          "id": "Vt2MjiBepwghEZFo",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {},
       "type": "n8n-nodes-base.limit",
       "typeVersion": 1,
       "position": [
-        -864,
-        272
+        -832,
+        160
       ],
-      "id": "4f7101ee-178f-4e69-b992-8cde0b4e948d",
+      "id": "f59f4fee-b861-4525-914b-71a7b167a815",
       "name": "Limit"
     },
     {
       "parameters": {
-        "amount": 15
+        "options": {}
       },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -608,
+        160
+      ],
+      "id": "1018eed8-c0ec-46c3-9fa9-c753c31d2083",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        400,
-        -144
+        64,
+        240
       ],
-      "id": "3d79b206-e88b-49a8-bf0b-01725e0ae0ae",
+      "id": "ac28e60a-e31c-4cd4-b236-518408fad740",
+      "name": "Wait",
+      "webhookId": "8eaeb2d4-4e06-4d0a-96e2-78b85ce50ae9"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        512,
+        -104
+      ],
+      "id": "4389824a-63fa-4f86-a3f1-27c9c50f13be",
       "name": "Wait2",
-      "webhookId": "fad9ca4b-64e8-4b1d-b3f9-4f5043eb17e1"
+      "webhookId": "ed1d8f77-b6d8-4f7b-88af-45c8203478b3"
     }
   ],
   "connections": {
@@ -262,40 +302,11 @@
         ]
       ]
     },
-    "Loop Over Items": {
-      "main": [
-        [
-          {
-            "node": "Wait1",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "HTTP Request1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Consulta Token": {
       "main": [
         [
           {
             "node": "Code",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
             "type": "main",
             "index": 0
           }
@@ -324,7 +335,7 @@
       "main": [
         [
           {
-            "node": "Loop Over Items1",
+            "node": "Wait2",
             "type": "main",
             "index": 0
           }
@@ -346,7 +357,7 @@
       "main": [
         [
           {
-            "node": "Wait2",
+            "node": "Code2",
             "type": "main",
             "index": 0
           }
@@ -371,11 +382,33 @@
         ]
       ]
     },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "FTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Code1": {
       "main": [
         [
           {
             "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FTP": {
+      "main": [
+        [
+          {
+            "node": "Enviar texto",
             "type": "main",
             "index": 0
           }
@@ -393,11 +426,40 @@
         ]
       ]
     },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Wait2": {
       "main": [
         [
           {
-            "node": "Code2",
+            "node": "Loop Over Items1",
             "type": "main",
             "index": 0
           }
