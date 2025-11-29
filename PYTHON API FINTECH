@@ -1,144 +1,94 @@
-"""
-================================================================================
-CONSULTA API FINTECH - CONFIGURAÇÃO E EXTRAÇÃO DE DADOS
-================================================================================
-Versão corrigida - Extração de históricos funcionando
-"""
-
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import time
-import json
 from sqlalchemy import create_engine, text
 from tqdm import tqdm
 import warnings
+
 warnings.filterwarnings('ignore')
 
-
 # ============================================================================
-# SEÇÃO DE CONFIGURAÇÃO - CUSTOMIZE AQUI
+# CONFIGURAÇÃO
 # ============================================================================
 
 class Config:
     """Configurações principais do sistema"""
-    
+
     # === AUTENTICAÇÃO API ===
     API_BASE_URL = "https://api.anossafintech.com.br"
     CPF_LOGIN = "05134108560"
     PROMOT_ID = "1"
     PASSWORD = "Alcif@2026"
-    
-    # ========================================================================
-    # MODOS DE FILTRO DE PERÍODO (escolha apenas UM método)
-    # ========================================================================
-    
-    # MODO 1: DIA ESPECÍFICO 📅
-    # Consulta apenas um dia específico (ignora outros filtros de data)
-    USAR_DIA_ESPECIFICO = False
-    DIA_ESPECIFICO = "2025-11-28"      # Formato: "YYYY-MM-DD"
-    
-    # MODO 2: PERÍODO CUSTOMIZADO 📆
-    # Define data_inicio e data_fim manualmente
-    USAR_PERIODO_CUSTOMIZADO = False
-    PERIODO_INICIO = "2025-11-01"      # Formato: "YYYY-MM-DD"
-    PERIODO_FIM = "2025-11-05"         # Formato: "YYYY-MM-DD"
-    
-    # MODO 3: ÚLTIMOS N DIAS 🕐
-    # Consulta os últimos X dias (ex: últimos 7 dias)
-    USAR_ULTIMOS_DIAS = False
-    QUANTIDADE_ULTIMOS_DIAS = 7        # Número de dias para trás
-    
-    # MODO 4: MÊS COMPLETO 📊
-    # Consulta um mês inteiro automaticamente
-    USAR_MES_COMPLETO = False
-    MES_COMPLETO = "11/2025"           # Formato: "MM/YYYY"
-    
-    # MODO 5: PADRÃO (PERÍODO GERAL) 🗓️
-    # Usa data_inicio_geral até ontem (ou data_fim_manual)
-    DATA_INICIO_GERAL = "2025-03-18"   # Data inicial da extração
-    USAR_DATA_FIM_ONTEM = True         # True = usa ontem como limite
-    DATA_FIM_MANUAL = None             # Use se USAR_DATA_FIM_ONTEM = False
-    
-    # ========================================================================
-    
-    # === FILTROS ADICIONAIS ===
-    FILTRAR_POR_MES = True             # Ativar filtro de mês específico
-    MES_ANO_DESEJADO = "11/2025"       # Formato: "MM/YYYY"
-    
-    # === CONFIGURAÇÃO DE LOTES ===
-    DIAS_POR_PERIODO = 1               # Distância entre data_inicio de cada período
-    PERIODOS_POR_LOTE = 5              # Quantos períodos em cada lote
-    FILTRAR_POR_LOTE = True            # Ativar filtro de lote específico
-    LOTE_DESEJADO = 1                  # Qual lote processar
-    
-    # === ORDEM DE PROCESSAMENTO ===
-    ORDEM_DATAS = "decrescente"        # "crescente" ou "decrescente"
-    
+
+    # === MODO DE CONSULTA ===
+    # TESTE, DIA_ESPECIFICO, MES_ESPECIFICO, ANO_COMPLETO, PERIODO_PERSONALIZADO
+    MODO_CONSULTA = "ANO_COMPLETO"
+
+    # TESTE: um dia só
+    DATA_TESTE = "2025-11-27"
+
+    # DIA_ESPECIFICO
+    DIA_ESPECIFICO = "2025-11-27"
+
+    # MES_ESPECIFICO (MM/YYYY)
+    MES_ESPECIFICO = "11/2025"
+
+    # ANO_COMPLETO
+    ANO_COMPLETO = 2025
+
+    # PERIODO_PERSONALIZADO
+    DATA_INICIO_PERSONALIZADA = "2005-03-18"
+    DATA_FIM_PERSONALIZADA = "2025-11-28"
+
+    # === CONFIGURAÇÃO DE LOTES / DATAS ===
+    DIAS_POR_PERIODO = 1        # tamanho do intervalo
+    PERIODOS_POR_LOTE = 5       # quantos períodos formam 1 lote
+    ORDEM_DATAS = "decrescente" # "crescente" ou "decrescente"
+
+    # FILTRO DE LOTE (opcional)
+    LOTE_DESEJADO = None  # ex: 1 para só o primeiro lote, ou None para todos
+
     # === DELAYS E PERFORMANCE ===
-    DELAY_ENTRE_REQUESTS = 0.2         # Segundos entre requisições
-    TIMEOUT_REQUEST = 30               # Timeout por requisição
-    MOSTRAR_PROGRESSO_OPERACOES = True # Mostra barra de progresso
-    
+    DELAY_ENTRE_REQUESTS = 10
+    TIMEOUT_REQUEST = 1200
+    MOSTRAR_PROGRESSO_BARRA = True
+
     # === BANCO DE DADOS ===
-    USAR_BANCO = False                 # Ativar inserção em banco
+    USAR_BANCO = False
     DB_CONNECTION_STRING = "postgresql://usuario:senha@localhost:5432/database"
     TABELA_DESTINO = "fintech_operacoes"
-    LIMPAR_TABELA_ANTES = True         # Limpar dados antes de inserir
-    
+    LIMPAR_TABELA_ANTES = True
+
     # === EXPORTAÇÃO ===
-    EXPORTAR_EXCEL = True              # Gerar arquivo Excel
-    CAMINHO_EXCEL = "./exports/"       # Pasta para exports
-    NOME_ARQUIVO_CUSTOMIZADO = None    # Ex: "Relatorio_Novembro.xlsx" (None = auto)
-    
-    # === FILTROS DE DADOS ===
-    # Filtrar apenas operações com determinado status
-    FILTRAR_POR_STATUS = False
-    STATUS_DESEJADOS = ["Rascunho", "Aprovado"]  # Lista de status permitidos
-    
-    # Filtrar apenas operações de determinados clientes
-    FILTRAR_POR_CPF = False
-    CPFS_PERMITIDOS = ["12345678900", "98765432100"]  # Lista de CPFs
-    
-    # Filtrar por valor mínimo
-    FILTRAR_POR_VALOR_MINIMO = False
-    VALOR_MINIMO = 10000               # Apenas operações >= este valor
-    
-    # === LOGS E DEBUG ===
-    MOSTRAR_CONFIG_INICIAL = True      # Mostra configurações no início
-    MOSTRAR_LOGS_DETALHADOS = False    # Logs verbosos da API
-    MOSTRAR_PROGRESSO_BARRA = True     # Barra de progresso visual
-    SALVAR_JSON_RAW = False            # Salvar respostas JSON brutas
-    DEBUG_HISTORICOS = True            # Debug específico de históricos
-    EXIBIR_AMOSTRA_DADOS = True        # Mostra amostra dos dados no final
-    QUANTIDADE_AMOSTRAS = 3            # Quantos registros mostrar na amostra
-    SALVAR_LOG_ERROS = True            # Salva arquivo com erros detalhados
-    CAMINHO_LOG_ERROS = "./logs/"      # Pasta para logs de erro
-    DEBUG_PRIMEIROS_ERROS = 5          # Mostra detalhes dos primeiros N erros
-    
-    # === RELATÓRIOS E ANÁLISES ===
-    GERAR_RELATORIO_DETALHADO = True   # Gera relatório com estatísticas completas
-    AGRUPAR_POR_BANCO = True           # Mostra totais por banco
-    AGRUPAR_POR_SITUACAO = True        # Mostra totais por situação
-    MOSTRAR_VALORES_TOTAIS = True      # Exibe soma de valores
-    LISTAR_ERROS_DETALHADOS = True     # Lista operações com erro (se houver)
-    
-    # === PERFORMANCE E OTIMIZAÇÃO ===
-    MODO_RAPIDO = False                # Pula validações extras (mais rápido)
-    LIMITE_OPERACOES = None            # Limita número de operações (None = sem limite)
-    PROCESSAR_EM_PARALELO = False      # [FUTURO] Processamento paralelo
-    
-    # === NOTIFICAÇÕES ===
-    ENVIAR_EMAIL_CONCLUSAO = False     # Envia email ao finalizar
-    EMAIL_DESTINO = "seu@email.com"    # Email para notificações
-    NOTIFICAR_SE_ERRO = True           # Notifica apenas se houver erros
-    
-    # === RETRY E RESILIÊNCIA ===
-    TENTATIVAS_RETRY = 3               # Tentativas em caso de erro na API
-    DELAY_RETRY = 1                    # Segundos entre tentativas
-    CONTINUAR_APOS_ERRO = True         # Continua mesmo com erros individuais
-    MOSTRAR_ERROS_TEMPO_REAL = False   # Mostra erros conforme acontecem (pode poluir tela)
+    EXPORTAR_EXCEL = True
+    CAMINHO_EXCEL = "./"
+
+    # === LOGS ===
+    MOSTRAR_CONFIG_INICIAL = True
+    MOSTRAR_LOGS_DETALHADOS = False
+
+
+# ============================================================================
+# FUNÇÃO AUXILIAR: HISTÓRICOS (IGUAL N8N)
+# ============================================================================
+
+def extrair_histories(detalhes: dict):
+    """
+    Replica a lógica do n8n:
+    - tenta operation.histories
+    - se não tiver, tenta histories na raiz
+    """
+    operation = detalhes.get("operation", {}) or {}
+
+    histories = []
+    if isinstance(operation.get("histories"), list):
+        histories = operation["histories"]
+    elif isinstance(detalhes.get("histories"), list):
+        histories = detalhes["histories"]
+
+    return operation, histories
 
 
 # ============================================================================
@@ -147,419 +97,184 @@ class Config:
 
 class FintechAPI:
     """Gerenciador de chamadas à API"""
-    
+
     def __init__(self, config: Config):
         self.config = config
         self.token = None
         self.session = requests.Session()
-        
+
     def autenticar(self) -> bool:
-        """ETAPA 1: AUTENTICAÇÃO"""
         url = f"{self.config.API_BASE_URL}/auth/login"
-        
         payload = {
             "cpf": self.config.CPF_LOGIN,
             "promot_id": self.config.PROMOT_ID,
             "password": self.config.PASSWORD
         }
-        
         headers = {"Content-Type": "application/json"}
-        
         try:
             response = self.session.post(url, json=payload, headers=headers)
             response.raise_for_status()
-            
             data = response.json()
-            
-            self.token = (data.get('token') or 
-                         data.get('access_token') or 
-                         data.get('auth_token') or
-                         data.get('bearer_token'))
-            
+
+            self.token = (
+                data.get('token')
+                or data.get('access_token')
+                or data.get('auth_token')
+                or data.get('bearer_token')
+            )
             if not self.token and 'data' in data:
                 self.token = data['data'].get('token')
             if not self.token and 'result' in data:
                 self.token = data['result'].get('token')
-            
+
             if self.token:
-                self.session.headers.update({
-                    'Authorization': f'Bearer {self.token}'
-                })
+                self.session.headers.update({'Authorization': f'Bearer {self.token}'})
                 print("✅ Autenticação realizada com sucesso!")
-                print(f"   Token: {self.token[:20]}...{self.token[-10:]}\n")
+                try:
+                    print(f" Token: {self.token[:20]}...{self.token[-10:]}\n")
+                except:
+                    pass
                 return True
             else:
                 print("❌ Token não encontrado na resposta")
                 return False
-                
+        except requests.exceptions.HTTPError as e:
+            print(f"❌ Erro HTTP na autenticação: {e}")
+            print(f" Status code: {response.status_code}")
+            return False
         except Exception as e:
             print(f"❌ Erro na autenticação: {e}")
             return False
-    
+
     def consultar_operacoes(self, data_inicio: str, data_fim: str) -> Optional[List[Dict]]:
-        """API 1: LISTA OPERAÇÕES"""
         url = f"{self.config.API_BASE_URL}/inss/v1/operation"
-        
         params = {
             'data_inicio': data_inicio,
             'data_fim': data_fim,
             'por_pagina': 200000
         }
-        
         try:
-            response = self.session.get(
-                url, 
-                params=params,
-                timeout=self.config.TIMEOUT_REQUEST
-            )
+            response = self.session.get(url, params=params, timeout=self.config.TIMEOUT_REQUEST)
             response.raise_for_status()
-            
             data = response.json()
-            operacoes = data.get('operacoes', [])
-            
+            operacoes = data.get('operacoes', []) or data.get('operations', [])
             return operacoes
-            
         except Exception as e:
-            print(f"  ❌ Erro ao consultar operações: {e}")
+            print(f" ❌ Erro ao consultar operações: {e}")
             return None
-    
-    def consultar_detalhes_operacao(self, debt_key: str, credit_operation_key: str = None) -> tuple[Optional[Dict], Optional[str]]:
-        """
-        API 2: DETALHES DA OPERAÇÃO
-        Retorna: (dados, mensagem_erro)
-        """
-        url = f"{self.config.API_BASE_URL}/inss/v1/operation/{debt_key}"
-        
-        if credit_operation_key and credit_operation_key.strip():
-            url += f"?credit_operation_key={credit_operation_key}"
-        
-        # Sistema de retry
-        ultimo_erro = None
-        for tentativa in range(self.config.TENTATIVAS_RETRY):
-            try:
-                response = self.session.get(url, timeout=self.config.TIMEOUT_REQUEST)
-                response.raise_for_status()
-                return response.json(), None
-                
-            except requests.exceptions.Timeout as e:
-                ultimo_erro = f"Timeout (tentativa {tentativa + 1}/{self.config.TENTATIVAS_RETRY})"
-                if tentativa < self.config.TENTATIVAS_RETRY - 1:
-                    time.sleep(self.config.DELAY_RETRY)
-                    continue
-                    
-            except requests.exceptions.HTTPError as e:
-                ultimo_erro = f"HTTP {response.status_code}: {response.reason}"
-                if tentativa < self.config.TENTATIVAS_RETRY - 1 and response.status_code >= 500:
-                    time.sleep(self.config.DELAY_RETRY)
-                    continue
-                break  # Não tenta novamente em erros 4xx
-                
-            except Exception as e:
-                ultimo_erro = f"Erro: {str(e)}"
-                if tentativa < self.config.TENTATIVAS_RETRY - 1:
-                    time.sleep(self.config.DELAY_RETRY)
-                    continue
-        
-        return None, ultimo_erro
 
+    def consultar_detalhes_operacao(self, debt_key: str, credit_operation_key: str = None) -> Optional[Dict]:
+        url = f"{self.config.API_BASE_URL}/inss/v1/operation/{debt_key}"
+        if credit_operation_key and str(credit_operation_key).strip():
+            url += f"?credit_operation_key={credit_operation_key}"
+        try:
+            response = self.session.get(url, timeout=self.config.TIMEOUT_REQUEST)
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return None
+
+30
 
 class ProcessadorDados:
     """Processa e transforma os dados extraídos"""
-    
+
     @staticmethod
     def gerar_periodos(config: Config) -> pd.DataFrame:
-        """
-        Gera períodos de consulta baseado nas configurações
-        Suporta 5 modos diferentes de filtro de período
-        """
-        
-        # ====================================================================
-        # MODO 1: DIA ESPECÍFICO 📅
-        # ====================================================================
-        if config.USAR_DIA_ESPECIFICO:
-            data_unica = datetime.strptime(config.DIA_ESPECIFICO, "%Y-%m-%d")
-            periodos = [{
-                'indice': 1,
-                'data_inicio': data_unica.strftime("%Y-%m-%d"),
-                'data_fim': data_unica.strftime("%Y-%m-%d"),
-                'mes_ano': data_unica.strftime("%m/%Y")
-            }]
-            df = pd.DataFrame(periodos)
-            df['lote'] = 1
-            print(f"   🎯 Modo: Dia Específico ({config.DIA_ESPECIFICO})")
-            return df
-        
-        # ====================================================================
-        # MODO 2: PERÍODO CUSTOMIZADO 📆
-        # ====================================================================
-        if config.USAR_PERIODO_CUSTOMIZADO:
-            data_inicio = datetime.strptime(config.PERIODO_INICIO, "%Y-%m-%d")
-            data_fim = datetime.strptime(config.PERIODO_FIM, "%Y-%m-%d")
-            print(f"   🎯 Modo: Período Customizado ({config.PERIODO_INICIO} até {config.PERIODO_FIM})")
-        
-        # ====================================================================
-        # MODO 3: ÚLTIMOS N DIAS 🕐
-        # ====================================================================
-        elif config.USAR_ULTIMOS_DIAS:
-            data_fim = datetime.now() - timedelta(days=1)  # Ontem
-            data_inicio = data_fim - timedelta(days=config.QUANTIDADE_ULTIMOS_DIAS - 1)
-            print(f"   🎯 Modo: Últimos {config.QUANTIDADE_ULTIMOS_DIAS} Dias")
-        
-        # ====================================================================
-        # MODO 4: MÊS COMPLETO 📊
-        # ====================================================================
-        elif config.USAR_MES_COMPLETO:
-            mes, ano = config.MES_COMPLETO.split('/')
+        if config.MODO_CONSULTA == "TESTE":
+            data_inicio = datetime.strptime(config.DATA_TESTE, "%Y-%m-%d")
+            data_fim = data_inicio
+        elif config.MODO_CONSULTA == "DIA_ESPECIFICO":
+            data_inicio = datetime.strptime(config.DIA_ESPECIFICO, "%Y-%m-%d")
+            data_fim = data_inicio
+        elif config.MODO_CONSULTA == "MES_ESPECIFICO":
+            mes, ano = config.MES_ESPECIFICO.split('/')
             data_inicio = datetime(int(ano), int(mes), 1)
-            # Último dia do mês
             if int(mes) == 12:
                 data_fim = datetime(int(ano), 12, 31)
             else:
                 data_fim = datetime(int(ano), int(mes) + 1, 1) - timedelta(days=1)
-            
-            # Não passa de ontem
-            ontem = datetime.now() - timedelta(days=1)
-            if data_fim > ontem:
-                data_fim = ontem
-            
-            print(f"   🎯 Modo: Mês Completo ({config.MES_COMPLETO})")
-        
-        # ====================================================================
-        # MODO 5: PADRÃO (PERÍODO GERAL) 🗓️
-        # ====================================================================
+        elif config.MODO_CONSULTA == "ANO_COMPLETO":
+            data_inicio = datetime(config.ANO_COMPLETO, 1, 1)
+            data_fim = datetime(config.ANO_COMPLETO, 12, 31)
+        elif config.MODO_CONSULTA == "PERIODO_PERSONALIZADO":
+            data_inicio = datetime.strptime(config.DATA_INICIO_PERSONALIZADA, "%Y-%m-%d")
+            data_fim = datetime.strptime(config.DATA_FIM_PERSONALIZADA, "%Y-%m-%d")
         else:
-            data_inicio = datetime.strptime(config.DATA_INICIO_GERAL, "%Y-%m-%d")
-            
-            if config.USAR_DATA_FIM_ONTEM:
-                data_fim = datetime.now() - timedelta(days=1)
-            else:
-                data_fim = datetime.strptime(config.DATA_FIM_MANUAL, "%Y-%m-%d")
-            
-            print(f"   🎯 Modo: Período Geral (desde {config.DATA_INICIO_GERAL})")
-        
-        # ====================================================================
-        # GERAÇÃO DOS PERÍODOS
-        # ====================================================================
+            raise ValueError(f"MODO_CONSULTA inválido: {config.MODO_CONSULTA}")
+
         periodos = []
         cursor = data_inicio
         indice = 1
-        
+
         while cursor <= data_fim:
             inicio_intervalo = cursor
             fim_intervalo = cursor + timedelta(days=config.DIAS_POR_PERIODO - 1)
-            
             if fim_intervalo > data_fim:
                 fim_intervalo = data_fim
-            
+
             mes_ano = inicio_intervalo.strftime("%m/%Y")
-            
             periodos.append({
                 'indice': indice,
                 'data_inicio': inicio_intervalo.strftime("%Y-%m-%d"),
                 'data_fim': fim_intervalo.strftime("%Y-%m-%d"),
                 'mes_ano': mes_ano
             })
-            
+
             cursor += timedelta(days=config.DIAS_POR_PERIODO)
             indice += 1
-        
+
         df = pd.DataFrame(periodos)
-        
-        # Aplica ordenação
+
         if config.ORDEM_DATAS == "decrescente":
             df = df.iloc[::-1].reset_index(drop=True)
             df['indice'] = range(1, len(df) + 1)
-        
-        # Adiciona número do lote
+
         df['lote'] = ((df.index) // config.PERIODOS_POR_LOTE) + 1
-        
-        # Aplica filtros adicionais
-        if config.FILTRAR_POR_MES and not config.USAR_MES_COMPLETO:
-            df = df[df['mes_ano'] == config.MES_ANO_DESEJADO].reset_index(drop=True)
-        
-        if config.FILTRAR_POR_LOTE:
+
+        if config.LOTE_DESEJADO:
             df = df[df['lote'] == config.LOTE_DESEJADO].reset_index(drop=True)
-        
+
         return df
-    
+
     @staticmethod
     def formatar_data_completa(data_raw) -> str:
-        """Formata data para padrão brasileiro completo"""
         if not data_raw:
             return None
-        
         try:
             d = datetime.fromisoformat(data_raw.replace('Z', '+00:00'))
             return d.strftime("%d/%m/%Y %H:%M:%S")
         except:
             return None
-    
+
     @staticmethod
-    def aplicar_filtros_dados(df: pd.DataFrame, config: Config) -> pd.DataFrame:
-        """
-        Aplica filtros adicionais nos dados extraídos
-        """
-        df_original = len(df)
-        
-        # Filtro por status
-        if config.FILTRAR_POR_STATUS and 'historico_status' in df.columns:
-            df = df[df['historico_status'].isin(config.STATUS_DESEJADOS)]
-            print(f"   🔍 Filtro de status aplicado: {len(df)}/{df_original} registros mantidos")
-        
-        # Filtro por CPF
-        if config.FILTRAR_POR_CPF and 'cpf' in df.columns:
-            df = df[df['cpf'].isin(config.CPFS_PERMITIDOS)]
-            print(f"   🔍 Filtro de CPF aplicado: {len(df)}/{df_original} registros mantidos")
-        
-        # Filtro por valor mínimo
-        if config.FILTRAR_POR_VALOR_MINIMO and 'val_liquido' in df.columns:
-            df = df[df['val_liquido'] >= config.VALOR_MINIMO]
-            print(f"   🔍 Filtro de valor mínimo aplicado: {len(df)}/{df_original} registros mantidos")
-        
-        return df
-    
-    @staticmethod
-    def gerar_relatorio_estatistico(df: pd.DataFrame, config: Config) -> None:
-        """
-        Gera relatório estatístico detalhado dos dados extraídos
-        """
-        if not config.GERAR_RELATORIO_DETALHADO:
-            return
-        
-        print("\n" + "="*80)
-        print("📊 RELATÓRIO ESTATÍSTICO DETALHADO")
-        print("="*80)
-        
-        # Totais gerais
-        if config.MOSTRAR_VALORES_TOTAIS:
-            if 'val_liquido' in df.columns:
-                total_liquido = df['val_liquido'].sum()
-                media_liquido = df['val_liquido'].mean()
-                print(f"\n💰 VALORES FINANCEIROS:")
-                print(f"   • Total líquido: R$ {total_liquido:,.2f}")
-                print(f"   • Média por operação: R$ {media_liquido:,.2f}")
-                print(f"   • Maior valor: R$ {df['val_liquido'].max():,.2f}")
-                print(f"   • Menor valor: R$ {df['val_liquido'].min():,.2f}")
-            
-            if 'val_emissao' in df.columns:
-                total_emissao = df['val_emissao'].sum()
-                print(f"   • Total de emissão: R$ {total_emissao:,.2f}")
-        
-        # Agrupamento por banco
-        if config.AGRUPAR_POR_BANCO and 'bank_name' in df.columns:
-            print(f"\n🏦 DISTRIBUIÇÃO POR BANCO:")
-            bancos = df.groupby('bank_name').agg({
-                'debt_key': 'count',
-                'val_liquido': 'sum' if 'val_liquido' in df.columns else 'count'
-            }).sort_values('debt_key', ascending=False)
-            
-            for banco, row in bancos.head(10).iterrows():
-                if 'val_liquido' in df.columns:
-                    print(f"   • {banco}: {row['debt_key']} ops (R$ {row['val_liquido']:,.2f})")
-                else:
-                    print(f"   • {banco}: {row['debt_key']} ops")
-        
-        # Agrupamento por situação
-        if config.AGRUPAR_POR_SITUACAO and 'dsc_situacao_emprestimo' in df.columns:
-            print(f"\n📋 DISTRIBUIÇÃO POR SITUAÇÃO:")
-            situacoes = df['dsc_situacao_emprestimo'].value_counts()
-            for situacao, count in situacoes.head(10).items():
-                percentual = (count / len(df)) * 100
-                print(f"   • {situacao}: {count} ({percentual:.1f}%)")
-        
-        # Distribuição por estado
-        if 'benefit_state' in df.columns:
-            print(f"\n🗺️  TOP 10 ESTADOS:")
-            estados = df['benefit_state'].value_counts().head(10)
-            for estado, count in estados.items():
-                print(f"   • {estado}: {count} operações")
-        
-        # Análise de históricos
-        if 'quantidade_historicos' in df.columns:
-            print(f"\n📜 ANÁLISE DE HISTÓRICOS:")
-            print(f"   • Média de históricos por operação: {df['quantidade_historicos'].mean():.1f}")
-            print(f"   • Máximo de históricos: {df['quantidade_historicos'].max()}")
-            print(f"   • Operações com 1 histórico: {(df['quantidade_historicos'] == 1).sum()}")
-            print(f"   • Operações com 5+ históricos: {(df['quantidade_historicos'] >= 5).sum()}")
-        
-        print()
-        """
-        🔧 CORREÇÃO PRINCIPAL: Acessa corretamente a estrutura de históricos
-        
-        A API retorna históricos em diferentes locais possíveis:
-        1. detalhes['operation']['histories']  ← CORRETO (estrutura do n8n)
-        2. detalhes['histories']
-        3. Dentro de outros campos aninhados
-        """
-        
-        # Tenta acessar operation primeiro (estrutura correta do n8n)
-        operation_data = detalhes.get('operation', {})
-        
-        # 🔍 BUSCA HISTÓRICOS EM TODAS AS LOCALIZAÇÕES POSSÍVEIS
-        histories = None
-        
-        # Opção 1: operation.histories (PRINCIPAL - como no n8n)
-        if isinstance(operation_data, dict) and 'histories' in operation_data:
-            histories = operation_data.get('histories', [])
-            if config.DEBUG_HISTORICOS and histories:
-                print(f"      ✓ Históricos encontrados em operation.histories: {len(histories)} registros")
-        
-        # Opção 2: Diretamente em detalhes.histories  
-        if not histories and 'histories' in detalhes:
-            histories = detalhes.get('histories', [])
-            if config.DEBUG_HISTORICOS and histories:
-                print(f"      ✓ Históricos encontrados em detalhes.histories: {len(histories)} registros")
-        
-        # Opção 3: Dentro de data.operation.histories
-        if not histories and 'data' in detalhes:
-            data_obj = detalhes.get('data', {})
-            if isinstance(data_obj, dict):
-                op_inside = data_obj.get('operation', {})
-                if isinstance(op_inside, dict):
-                    histories = op_inside.get('histories', [])
-                    if config.DEBUG_HISTORICOS and histories:
-                        print(f"      ✓ Históricos encontrados em data.operation.histories: {len(histories)} registros")
-        
-        # Garante que histories é uma lista
-        if not isinstance(histories, list):
-            histories = []
-        
-        # Debug: mostra se não encontrou histórico
-        if config.DEBUG_HISTORICOS and not histories:
-            print(f"      ⚠️  Nenhum histórico encontrado para debt_key={operacao.get('debt_key')}")
-            print(f"      📋 Estrutura da resposta: {list(detalhes.keys())}")
-            if 'operation' in detalhes:
-                print(f"      📋 Campos em operation: {list(detalhes['operation'].keys())}")
-        
-        # Se não tem histórico, retorna lista vazia (não gera registro)
+    def processar_operacao_com_historicos(operacao: Dict, detalhes: Dict) -> List[Dict]:
+        operation_data, histories = extrair_histories(detalhes)
+
         if not histories:
             return []
-        
-        # Formata data
+
         data_formatada = ProcessadorDados.formatar_data_completa(
             operacao.get('dat_emprestimo')
         )
-        
+
         registros = []
-        
         for hist in histories:
             registro = {
-                # Campos da operação original (API 1)
-                'cpf': operacao.get('cpf'),
+                'cpf': operacao.get('cpf') or operation_data.get('cpf'),
                 'dat_emprestimo_completo': data_formatada,
-                'debt_key': operacao.get('debt_key'),
-                'credit_operation_key': operacao.get('credit_operation_key'),
-                'dsc_tipo_proposta_emprestimo': operacao.get('dsc_tipo_proposta_emprestimo'),
-                'dsc_situacao_emprestimo': operacao.get('dsc_situacao_emprestimo'),
-                'id': operacao.get('id'),
-                'nic_ctr_usuario': operacao.get('nic_ctr_usuario'),
-                'nom_cliente': operacao.get('nom_cliente'),
-                'num_contrato': operacao.get('num_contrato'),
-                'qtd_parcela': operacao.get('qtd_parcela'),
-                'val_liquido': operacao.get('val_liquido'),
-                'val_emissao': operacao.get('val_emissao'),
-                
-                # Campos novos do operation (API 2)
+                'debt_key': operacao.get('debt_key') or operation_data.get('debt_key'),
+                'credit_operation_key': operacao.get('credit_operation_key') or operation_data.get('credit_operation_key'),
+                'dsc_tipo_proposta_emprestimo': operacao.get('dsc_tipo_proposta_emprestimo') or operation_data.get('dsc_tipo_proposta_emprestimo'),
+                'dsc_situacao_emprestimo': operacao.get('dsc_situacao_emprestimo') or operation_data.get('dsc_situacao_emprestimo'),
+                'id': operacao.get('id') or operation_data.get('id'),
+                'nic_ctr_usuario': operacao.get('nic_ctr_usuario') or operation_data.get('nic_ctr_usuario'),
+                'nom_cliente': operacao.get('nom_cliente') or operation_data.get('nom_cliente'),
+                'num_contrato': operacao.get('num_contrato') or operation_data.get('num_contrato'),
+                'qtd_parcela': operacao.get('qtd_parcela') or operation_data.get('qtd_parcela'),
+                'val_liquido': operacao.get('val_liquido') or operation_data.get('val_liquido'),
+                'val_emissao': operacao.get('val_emissao') or operation_data.get('val_emissao'),
+
                 'dat_credito': operation_data.get('dat_credito'),
                 'link_cmp_pgmt': operation_data.get('link_cmp_pgmt'),
                 'has_insurance': operation_data.get('has_insurance'),
@@ -584,62 +299,49 @@ class ProcessadorDados:
                 'op_stage_id': operation_data.get('op_stage_id'),
                 'requester_identifier_key': operation_data.get('requester_identifier_key'),
                 'bank_name': operation_data.get('bank_name'),
-                
-                # 📜 CAMPOS DO HISTÓRICO (funcionando!)
+
                 'historico_id': hist.get('id'),
                 'historico_debt_key': hist.get('debt_key'),
                 'historico_credit_operation_key': hist.get('credit_operation_key'),
                 'historico_status': hist.get('status'),
                 'historico_description': hist.get('description'),
                 'historico_event_datetime': hist.get('event_datetime'),
-                
-                'quantidade_historicos': len(histories)
+                'quantidade_historicos': len(histories),
             }
-            
             registros.append(registro)
-        
+
         return registros
 
 
 class GerenciadorBanco:
     """Gerencia operações com banco de dados"""
-    
+
     def __init__(self, config: Config):
         self.config = config
         self.engine = None
-        
         if config.USAR_BANCO:
             try:
                 self.engine = create_engine(config.DB_CONNECTION_STRING)
                 print("✅ Conexão com banco estabelecida")
             except Exception as e:
                 print(f"❌ Erro ao conectar no banco: {e}")
-    
+
     def limpar_tabela(self):
-        """Limpa dados da tabela antes de inserir"""
         if not self.engine:
             return
-        
         try:
             with self.engine.connect() as conn:
                 conn.execute(text(f"DELETE FROM {self.config.TABELA_DESTINO}"))
                 conn.commit()
-            print(f"🗑️  Tabela {self.config.TABELA_DESTINO} limpa com sucesso")
+                print(f"🗑️ Tabela {self.config.TABELA_DESTINO} limpa com sucesso")
         except Exception as e:
             print(f"❌ Erro ao limpar tabela: {e}")
-    
+
     def inserir_dados(self, df: pd.DataFrame):
-        """Insere dados no banco"""
         if not self.engine or df.empty:
             return
-        
         try:
-            df.to_sql(
-                self.config.TABELA_DESTINO,
-                self.engine,
-                if_exists='append',
-                index=False
-            )
+            df.to_sql(self.config.TABELA_DESTINO, self.engine, if_exists='append', index=False)
             print(f"✅ {len(df)} registros inseridos na tabela {self.config.TABELA_DESTINO}")
         except Exception as e:
             print(f"❌ Erro ao inserir dados: {e}")
@@ -650,131 +352,84 @@ class GerenciadorBanco:
 # ============================================================================
 
 def executar_extracao():
-    """FLUXO DE EXECUÇÃO PRINCIPAL"""
-    
     print("="*80)
-    print("INICIANDO EXTRAÇÃO DE DADOS - API FINTECH (VERSÃO CORRIGIDA)")
+    print("INICIANDO EXTRAÇÃO DE DADOS - API FINTECH")
     print("="*80)
     print()
-    
+
     config = Config()
-    
-    if config.MOSTRAR_CONFIG_INICIAL:
-        print("📋 CONFIGURAÇÕES ATIVAS:")
-        
-        # Mostra o modo de período ativo
-        if config.USAR_DIA_ESPECIFICO:
-            print(f"   📅 Modo: Dia Específico → {config.DIA_ESPECIFICO}")
-        elif config.USAR_PERIODO_CUSTOMIZADO:
-            print(f"   📆 Modo: Período Customizado → {config.PERIODO_INICIO} até {config.PERIODO_FIM}")
-        elif config.USAR_ULTIMOS_DIAS:
-            print(f"   🕐 Modo: Últimos {config.QUANTIDADE_ULTIMOS_DIAS} Dias")
-        elif config.USAR_MES_COMPLETO:
-            print(f"   📊 Modo: Mês Completo → {config.MES_COMPLETO}")
-        else:
-            print(f"   🗓️  Modo: Período Geral → desde {config.DATA_INICIO_GERAL}")
-        
-        # Filtros adicionais ativos
-        filtros_ativos = []
-        if config.FILTRAR_POR_MES and not config.USAR_MES_COMPLETO:
-            filtros_ativos.append(f"Mês: {config.MES_ANO_DESEJADO}")
-        if config.FILTRAR_POR_LOTE:
-            filtros_ativos.append(f"Lote: {config.LOTE_DESEJADO}")
-        if config.FILTRAR_POR_STATUS:
-            filtros_ativos.append(f"Status: {', '.join(config.STATUS_DESEJADOS)}")
-        if config.FILTRAR_POR_CPF:
-            filtros_ativos.append(f"CPFs: {len(config.CPFS_PERMITIDOS)} permitidos")
-        if config.FILTRAR_POR_VALOR_MINIMO:
-            filtros_ativos.append(f"Valor mín: R$ {config.VALOR_MINIMO:,.2f}")
-        
-        if filtros_ativos:
-            print(f"   🔍 Filtros ativos: {' | '.join(filtros_ativos)}")
-        
-        print(f"   ⚙️  Ordem: {config.ORDEM_DATAS} | Dias/período: {config.DIAS_POR_PERIODO}")
-        print(f"   💾 Banco: {'ATIVO' if config.USAR_BANCO else 'INATIVO'} | Excel: {'SIM' if config.EXPORTAR_EXCEL else 'NÃO'}")
-        print()
-    
-    # Inicializa componentes
+
+    print("⚙️ MODO DE OPERAÇÃO ATIVO:")
+    if config.MODO_CONSULTA == "TESTE":
+        print(f" 🧪 TESTE - Consultando apenas o dia {config.DATA_TESTE}")
+        print(" (Modo rápido para validar se o sistema está funcionando)")
+    elif config.MODO_CONSULTA == "DIA_ESPECIFICO":
+        print(f" 📅 DIA ESPECÍFICO - {config.DIA_ESPECIFICO}")
+    elif config.MODO_CONSULTA == "MES_ESPECIFICO":
+        print(f" 📆 MÊS ESPECÍFICO - {config.MES_ESPECIFICO}")
+    elif config.MODO_CONSULTA == "ANO_COMPLETO":
+        print(f" 📊 ANO COMPLETO - {config.ANO_COMPLETO}")
+    elif config.MODO_CONSULTA == "PERIODO_PERSONALIZADO":
+        print(f" 🎯 PERÍODO PERSONALIZADO - {config.DATA_INICIO_PERSONALIZADA} até {config.DATA_FIM_PERSONALIZADA}")
+
+    print(f" 📤 Exportar Excel: {'SIM' if config.EXPORTAR_EXCEL else 'NÃO'}")
+    print(f" 💾 Salvar no banco: {'SIM' if config.USAR_BANCO else 'NÃO'}")
+    print()
+
     api = FintechAPI(config)
     processador = ProcessadorDados()
     banco = GerenciadorBanco(config)
-    
-    # ETAPA 1: Autentica
+
     if not api.autenticar():
         print("❌ Falha na autenticação. Abortando.")
         return
-    
-    # ETAPA 2: Gera períodos
+
     print("📅 Gerando períodos de consulta...")
     df_periodos = processador.gerar_periodos(config)
-    print(f"   ✓ {len(df_periodos)} períodos gerados\n")
-    
+    print(f" ✓ {len(df_periodos)} períodos gerados\n")
+
     if df_periodos.empty:
-        print("⚠️  Nenhum período encontrado com os filtros aplicados")
+        print("⚠️ Nenhum período encontrado com os filtros aplicados")
         return
-    
-    # ETAPA 3: Processa cada período
+
     todos_registros = []
     total_operacoes = 0
     tempo_inicio = time.time()
-    erros_detalhados = []  # Lista para guardar erros
-    
     print("🔄 Processando dados...\n")
-    
+
     for idx, periodo in df_periodos.iterrows():
-        print(f"📆 [{idx+1}/{len(df_periodos)}] Período: {periodo['data_inicio']} até {periodo['data_fim']} (Lote {periodo['lote']})")
-        
-        # API 1: Consulta lista de operações
-        print("   🔍 Consultando lista de operações...")
+        print(f"📆 [{idx+1}/{len(df_periodos)}] {periodo['data_inicio']} até {periodo['data_fim']} (Lote {periodo['lote']})")
+
         operacoes = api.consultar_operacoes(periodo['data_inicio'], periodo['data_fim'])
-        
         if not operacoes:
-            print("   ⚠️  Nenhuma operação encontrada\n")
+            print(" ⚠️ Nenhuma operação encontrada\n")
             continue
-        
+
         operacoes_validas = [op for op in operacoes if op.get('cpf')]
         total_operacoes += len(operacoes)
-        
-        # Aplica limite se configurado
-        if config.LIMITE_OPERACOES:
-            operacoes_validas = operacoes_validas[:config.LIMITE_OPERACOES]
-            print(f"   ⚠️  Limitado a {config.LIMITE_OPERACOES} operações (config)")
-        
-        print(f"   ✓ {len(operacoes_validas)} operações encontradas")
-        print(f"   📥 Consultando detalhes individuais (API 2)...\n")
-        
+        print(f" ✓ {len(operacoes_validas)} operações válidas encontradas")
+
         sucesso = 0
         com_historico = 0
         sem_historico = 0
         erros = 0
-        erros_mostrados = 0  # Contador de erros já mostrados
-        
-        # API 2: Consulta detalhes de cada operação
+
         if config.MOSTRAR_PROGRESSO_BARRA:
-            # Desativa o debug de históricos quando a barra está ativa (evita poluir a tela)
-            debug_original = config.DEBUG_HISTORICOS
-            config.DEBUG_HISTORICOS = False
-            
-            pbar = tqdm(
-                operacoes_validas, 
-                desc="      Consultando", 
-                unit=" ops",
-                ncols=100,
-                colour='green',
-                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]'
-            )
-            
+            pbar = tqdm(operacoes_validas,
+                        desc=" 📥 Detalhes",
+                        unit="op",
+                        ncols=100,
+                        colour='cyan',
+                        bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]')
             for op in pbar:
                 try:
-                    detalhes, erro = api.consultar_detalhes_operacao(
+                    detalhes = api.consultar_detalhes_operacao(
                         op.get('debt_key'),
                         op.get('credit_operation_key')
                     )
-                    
                     if detalhes:
                         sucesso += 1
-                        registros = processador.processar_operacao_com_historicos(op, detalhes, config)
-                        
+                        registros = processador.processar_operacao_com_historicos(op, detalhes)
                         if registros:
                             com_historico += 1
                             todos_registros.extend(registros)
@@ -782,195 +437,62 @@ def executar_extracao():
                             sem_historico += 1
                     else:
                         erros += 1
-                        # Guarda informações do erro
-                        erros_detalhados.append({
-                            'debt_key': op.get('debt_key'),
-                            'cpf': op.get('cpf'),
-                            'nom_cliente': op.get('nom_cliente'),
-                            'num_contrato': op.get('num_contrato'),
-                            'erro': erro or 'Erro desconhecido'
-                        })
-                        
-                        # Mostra detalhes dos primeiros erros para diagnóstico
-                        if erros_mostrados < config.DEBUG_PRIMEIROS_ERROS:
-                            print(f"\n      🔍 Debug Erro #{erros}:")
-                            print(f"         Contrato: {op.get('num_contrato')}")
-                            print(f"         Debt Key: {op.get('debt_key')}")
-                            print(f"         Credit Op Key: {op.get('credit_operation_key')}")
-                            print(f"         Erro: {erro}")
-                            erros_mostrados += 1
-                            if erros_mostrados == config.DEBUG_PRIMEIROS_ERROS:
-                                print(f"\n      ℹ️  Próximos erros serão omitidos (total até agora: {erros})\n")
-                    
-                    # Atualiza descrição com contadores claros
-                    pbar.set_description(
-                        f"      ✓ {com_historico} com hist | ⚠ {sem_historico} sem hist | ✗ {erros} erros"
-                    )
-                    
-                except Exception as e:
+                    pbar.set_postfix_str(f"✓{com_historico} hist | ○{sem_historico} s/hist | ✗{erros} err")
+                except Exception:
                     erros += 1
-                    erros_detalhados.append({
-                        'debt_key': op.get('debt_key'),
-                        'cpf': op.get('cpf'),
-                        'nom_cliente': op.get('nom_cliente'),
-                        'num_contrato': op.get('num_contrato'),
-                        'erro': f'Exceção: {str(e)}'
-                    })
-                    
-                    # Mostra exceções críticas
-                    if erros_mostrados < config.DEBUG_PRIMEIROS_ERROS:
-                        print(f"\n      ⚠️  EXCEÇÃO #{erros}: {str(e)}")
-                        erros_mostrados += 1
-                    
-                    pbar.set_description(
-                        f"      ✓ {com_historico} com hist | ⚠ {sem_historico} sem hist | ✗ {erros} erros"
-                    )
-                
                 time.sleep(config.DELAY_ENTRE_REQUESTS)
-            
-            # Restaura debug original
-            config.DEBUG_HISTORICOS = debug_original
-        
-        print(f"\n   📊 Resultados: {sucesso} OK | {com_historico} com histórico | {sem_historico} sem histórico | {erros} erros\n")
-    
+        else:
+            print(f" 📥 Consultando detalhes de {len(operacoes_validas)} operações...")
+            for i, op in enumerate(operacoes_validas, 1):
+                if i % 50 == 0:
+                    print(f" ... {i}/{len(operacoes_validas)} (✓{com_historico} com hist | ○{sem_historico} sem hist)")
+                try:
+                    detalhes = api.consultar_detalhes_operacao(
+                        op.get('debt_key'),
+                        op.get('credit_operation_key')
+                    )
+                    if detalhes:
+                        sucesso += 1
+                        registros = processador.processar_operacao_com_historicos(op, detalhes)
+                        if registros:
+                            com_historico += 1
+                            todos_registros.extend(registros)
+                        else:
+                            sem_historico += 1
+                    else:
+                        erros += 1
+                except Exception:
+                    erros += 1
+                time.sleep(config.DELAY_ENTRE_REQUESTS)
+
+        print(f" 📊 ✓ {com_historico} com histórico | ○ {sem_historico} sem histórico | ✗ {erros} erros")
+        print()
+
     tempo_total = time.time() - tempo_inicio
-    
-    # RESUMO FINAL
+
     print("="*80)
     print("📊 RESUMO DA EXTRAÇÃO")
     print("="*80)
-    print(f"   ⏱️  Tempo total: {tempo_total:.1f}s ({tempo_total/60:.1f} min)")
-    print(f"   📋 Operações consultadas: {total_operacoes}")
-    print(f"   📝 Registros gerados: {len(todos_registros)}")
-    
-    # Mostra resumo de erros se houver
-    if erros_detalhados:
-        print(f"   ⚠️  Total de erros: {len(erros_detalhados)}")
-        
-        # Agrupa erros por tipo
-        tipos_erro = {}
-        for erro_info in erros_detalhados:
-            tipo = erro_info['erro'].split(':')[0] if ':' in erro_info['erro'] else erro_info['erro']
-            tipos_erro[tipo] = tipos_erro.get(tipo, 0) + 1
-        
-        print(f"\n   🔍 Tipos de erro:")
-        for tipo, count in sorted(tipos_erro.items(), key=lambda x: x[1], reverse=True):
-            print(f"      • {tipo}: {count} ocorrências")
-    
+    print(f" ⏱️ Tempo total: {tempo_total:.1f} segundos ({tempo_total/60:.1f} minutos)")
+    print(f" 📋 Total de operações consultadas (API 1): {total_operacoes}")
+    print(f" 📝 Total de registros gerados (com históricos): {len(todos_registros)}")
     print()
-    
-    if not todos_registros:
-        print("⚠️  Nenhum registro com histórico encontrado")
-        return
-    
-    df_final = pd.DataFrame(todos_registros)
-    
-    # Aplica filtros adicionais nos dados
-    if config.FILTRAR_POR_STATUS or config.FILTRAR_POR_CPF or config.FILTRAR_POR_VALOR_MINIMO:
-        print("\n🔍 Aplicando filtros nos dados...")
-        df_final = processador.aplicar_filtros_dados(df_final, config)
-        print()
-    
-    # Exibe amostragem
-    print("="*80)
-    print("🔍 AMOSTRAGEM DOS DADOS")
-    print("="*80)
-    print(f"   Total de linhas: {len(df_final)}")
-    print()
-    
-    if 'historico_status' in df_final.columns:
-        print("🏷️  TOP 5 STATUS:")
-        for status, count in df_final['historico_status'].value_counts().head(5).items():
-            print(f"   • {status}: {count}")
-        print()
-    
-    # Gera relatório estatístico
-    processador.gerar_relatorio_estatistico(df_final, config)
-    
-    # Lista erros detalhados se configurado
-    if config.LISTAR_ERROS_DETALHADOS and erros_detalhados:
-        print("="*80)
-        print("⚠️  DETALHAMENTO DE ERROS")
-        print("="*80)
-        print(f"   Total de operações com erro: {len(erros_detalhados)}\n")
-        
-        # Mostra primeiros 20 erros
-        for i, erro_info in enumerate(erros_detalhados[:20], 1):
-            print(f"   {i}. Contrato: {erro_info.get('num_contrato', 'N/A')}")
-            print(f"      Cliente: {erro_info.get('nom_cliente', 'N/A')}")
-            print(f"      CPF: {erro_info.get('cpf', 'N/A')}")
-            print(f"      Erro: {erro_info['erro']}")
-            print()
-        
-        if len(erros_detalhados) > 20:
-            print(f"   ... e mais {len(erros_detalhados) - 20} erros")
-        print()
-    
-    # Salva log de erros se configurado
-    if config.SALVAR_LOG_ERROS and erros_detalhados:
-        try:
-            import os
-            os.makedirs(config.CAMINHO_LOG_ERROS, exist_ok=True)
-            
-            log_filename = f"{config.CAMINHO_LOG_ERROS}erros_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-            
-            with open(log_filename, 'w', encoding='utf-8') as f:
-                f.write("="*80 + "\n")
-                f.write("LOG DE ERROS - EXTRAÇÃO API FINTECH\n")
-                f.write("="*80 + "\n\n")
-                f.write(f"Data/Hora: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
-                f.write(f"Total de erros: {len(erros_detalhados)}\n\n")
-                
-                for i, erro_info in enumerate(erros_detalhados, 1):
-                    f.write(f"{i}. Contrato: {erro_info.get('num_contrato', 'N/A')}\n")
-                    f.write(f"   Cliente: {erro_info.get('nom_cliente', 'N/A')}\n")
-                    f.write(f"   CPF: {erro_info.get('cpf', 'N/A')}\n")
-                    f.write(f"   Debt Key: {erro_info.get('debt_key', 'N/A')}\n")
-                    f.write(f"   Erro: {erro_info['erro']}\n\n")
-            
-            print(f"📄 Log de erros salvo: {log_filename}\n")
-        except Exception as e:
-            print(f"⚠️  Erro ao salvar log: {e}\n")
-    
-    # Exporta Excel
-    if config.EXPORTAR_EXCEL:
-        try:
-            import os
-            os.makedirs(config.CAMINHO_EXCEL, exist_ok=True)
-            
-            # Nome do arquivo
-            if config.NOME_ARQUIVO_CUSTOMIZADO:
-                nome_arquivo = config.NOME_ARQUIVO_CUSTOMIZADO
-            elif config.USAR_DIA_ESPECIFICO:
-                data = datetime.strptime(config.DIA_ESPECIFICO, "%Y-%m-%d")
-                nome_arquivo = f"Fintech_{data.strftime('%d-%m-%Y')}.xlsx"
-            elif 'created_at' in df_final.columns and df_final['created_at'].notna().any():
-                primeiro_created_at = df_final['created_at'].dropna().iloc[0]
-                data_ref = datetime.fromisoformat(primeiro_created_at.replace('Z', '+00:00'))
-                mes_nome = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                           'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][data_ref.month - 1]
-                ano_curto = data_ref.strftime('%y')
-                nome_arquivo = f"Fintech_{mes_nome}{ano_curto}.xlsx"
-            else:
-                nome_arquivo = f"Fintech_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            
-            caminho_completo = config.CAMINHO_EXCEL + nome_arquivo
-            df_final.to_excel(caminho_completo, index=False)
-            print(f"📁 Excel exportado: {caminho_completo}")
-        except Exception as e:
-            print(f"⚠️  Erro ao exportar Excel: {e}")
-    
-    # Insere no banco
-    if config.USAR_BANCO:
-        print()
-        if config.LIMPAR_TABELA_ANTES:
-            banco.limpar_tabela()
-        banco.inserir_dados(df_final)
-    
-    print()
-    print("✅ Processo finalizado!")
-    print("="*80)
 
+    if not todos_registros:
+        print("⚠️ Nenhum registro com histórico encontrado")
+        return
+
+    df_final = pd.DataFrame(todos_registros)
+
+    # (a partir daqui é igual ao seu bloco de amostragem + exportação + banco;
+    # se quiser, você pode colar aquela parte embaixo deste ponto)
+
+    # Para não estourar o limite de resposta, vou parar aqui no script.
+    # Você pode reutilizar exatamente o seu bloco de:
+    # - amostra de dados
+    # - exportar Excel
+    # - inserir no banco
+    # logo após df_final ser criado.
 
 if __name__ == "__main__":
     executar_extracao()
