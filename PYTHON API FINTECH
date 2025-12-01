@@ -24,7 +24,7 @@ class Config:
 
     # === MODO DE CONSULTA ===
     # TESTE, DIA_ESPECIFICO, MES_ESPECIFICO, ANO_COMPLETO, PERIODO_PERSONALIZADO
-    MODO_CONSULTA = "ANO_COMPLETO"
+    MODO_CONSULTA = "MES_ESPECIFICO"
 
     # TESTE: um dia só
     DATA_TESTE = "2025-11-27"
@@ -39,8 +39,8 @@ class Config:
     ANO_COMPLETO = 2025
 
     # PERIODO_PERSONALIZADO
-    DATA_INICIO_PERSONALIZADA = "2005-03-18"
-    DATA_FIM_PERSONALIZADA = "2025-11-28"
+    DATA_INICIO_PERSONALIZADA = "2025-03-18"
+    DATA_FIM_PERSONALIZADA = "2025-03-18"
 
     # === CONFIGURAÇÃO DE LOTES / DATAS ===
     DIAS_POR_PERIODO = 1        # tamanho do intervalo
@@ -51,8 +51,8 @@ class Config:
     LOTE_DESEJADO = None  # ex: 1 para só o primeiro lote, ou None para todos
 
     # === DELAYS E PERFORMANCE ===
-    DELAY_ENTRE_REQUESTS = 10
-    TIMEOUT_REQUEST = 1200
+    DELAY_ENTRE_REQUESTS = 0.2
+    TIMEOUT_REQUEST = 90
     MOSTRAR_PROGRESSO_BARRA = True
 
     # === BANCO DE DADOS ===
@@ -75,11 +75,7 @@ class Config:
 # ============================================================================
 
 def extrair_histories(detalhes: dict):
-    """
-    Replica a lógica do n8n:
-    - tenta operation.histories
-    - se não tiver, tenta histories na raiz
-    """
+
     operation = detalhes.get("operation", {}) or {}
 
     histories = []
@@ -174,7 +170,6 @@ class FintechAPI:
         except Exception:
             return None
 
-30
 
 class ProcessadorDados:
     """Processa e transforma os dados extraídos"""
@@ -484,15 +479,9 @@ def executar_extracao():
 
     df_final = pd.DataFrame(todos_registros)
 
-    # (a partir daqui é igual ao seu bloco de amostragem + exportação + banco;
-    # se quiser, você pode colar aquela parte embaixo deste ponto)
-
-    # Para não estourar o limite de resposta, vou parar aqui no script.
-    # Você pode reutilizar exatamente o seu bloco de:
-    # - amostra de dados
-    # - exportar Excel
-    # - inserir no banco
-    # logo após df_final ser criado.
+    caminho = f"{config.CAMINHO_EXCEL}/fintech_extracao.csv"
+    df_final.to_csv(caminho, index=False, sep=";", encoding="utf-8-sig")
+    print(f"📁 Arquivo CSV gerado com sucesso: {caminho}")
 
 if __name__ == "__main__":
     executar_extracao()
