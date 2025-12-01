@@ -6,13 +6,13 @@ import time
 from sqlalchemy import create_engine, text
 from tqdm import tqdm
 import warnings
+from cassandra.cluster import Cluster
+from cassandra.auth import PlainTextAuthProvider
+from cassandra.query import BatchStatement, SimpleStatement
 
 warnings.filterwarnings('ignore')
 
-# ============================================================================
 # CONFIGURAÇÃO
-# ============================================================================
-
 class Config:
     """Configurações principais do sistema"""
 
@@ -53,17 +53,28 @@ class Config:
     # === DELAYS E PERFORMANCE ===
     DELAY_ENTRE_REQUESTS = 0.2
     TIMEOUT_REQUEST = 90
-    MOSTRAR_PROGRESSO_BARRA = True
+    MOSTRAR_PROGRESSO_BARRA = False
 
-    # === BANCO DE DADOS ===
+    # === BANCO DE DADOS POSTGRESQL ===
     USAR_BANCO = False
     DB_CONNECTION_STRING = "postgresql://usuario:senha@localhost:5432/database"
     TABELA_DESTINO = "fintech_operacoes"
     LIMPAR_TABELA_ANTES = True
 
+    # === CASSANDRA ===
+    USAR_CASSANDRA = True
+    CASSANDRA_HOST = "localhost"
+    CASSANDRA_KEYSPACE = "debitos"
+    CASSANDRA_TABELA = "sheets_debitos"
+    CASSANDRA_TAMANHO_PACOTE = 1000
+    CASSANDRA_USERNAME = None  # Opcional
+    CASSANDRA_PASSWORD = None  # Opcional
+    LIMPAR_CASSANDRA_ANTES = False
+
     # === EXPORTAÇÃO ===
     EXPORTAR_EXCEL = True
     CAMINHO_EXCEL = "./"
+    CAMINHO_CSV_SAIDA = "/root/Debitos/estorno_final.csv"
 
     # === LOGS ===
     MOSTRAR_CONFIG_INICIAL = True
@@ -309,7 +320,7 @@ class ProcessadorDados:
 
 
 class GerenciadorBanco:
-    """Gerencia operações com banco de dados"""
+    """Gerencia operações com banco de dados PostgreSQL"""
 
     def __init__(self, config: Config):
         self.config = config
@@ -317,9 +328,9 @@ class GerenciadorBanco:
         if config.USAR_BANCO:
             try:
                 self.engine = create_engine(config.DB_CONNECTION_STRING)
-                print("✅ Conexão com banco estabelecida")
+                print("✅ Conexão com banco PostgreSQL estabelecida")
             except Exception as e:
-                print(f"❌ Erro ao conectar no banco: {e}")
+                print(f"❌ Erro ao conectar no banco PostgreSQL: {e}")
 
     def limpar_tabela(self):
         if not self.engine:
@@ -340,6 +351,156 @@ class GerenciadorBanco:
             print(f"✅ {len(df)} registros inseridos na tabela {self.config.TABELA_DESTINO}")
         except Exception as e:
             print(f"❌ Erro ao inserir dados: {e}")
+
+
+class GerenciadorCassandra:
+    """Gerencia operações com banco de dados Cassandra"""
+
+    def __init__(self, config: Config):
+        self.config = config
+        self.cluster = None
+        self.session = None
+        
+        if config.USAR_CASSANDRA:
+            try:
+                if config.CASSANDRA_USERNAME and config.CASSANDRA_PASSWORD:
+                    auth_provider = PlainTextAuthProvider(
+                        username=config.CASSANDRA_USERNAME,
+                        password=config.CASSANDRA_PASSWORD
+                    )
+                    self.cluster = Cluster([config.CASSANDRA_HOST], auth_provider=auth_provider)
+                else:
+                    self.cluster = Cluster([config.CASSANDRA_HOST])
+                
+                self.session = self.cluster.connect()
+                self.session.set_keyspace(config.CASSANDRA_KEYSPACE)
+                print(f"✅ Conexão com Cassandra estabelecida (keyspace: {config.CASSANDRA_KEYSPACE})")
+            except Exception as e:
+                print(f"❌ Erro ao conectar no Cassandra: {e}")
+                self.session = None
+
+    def criar_tabela(self):
+        """Cria a tabela no Cassandra se não existir"""
+        if not self.session:
+            return
+        
+        try:
+            create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS {self.config.CASSANDRA_TABELA} (
+                cpf TEXT,
+                debt_key TEXT,
+                credit_operation_key TEXT,
+                historico_id TEXT,
+                dat_emprestimo_completo TEXT,
+                dsc_tipo_proposta_emprestimo TEXT,
+                dsc_situacao_emprestimo TEXT,
+                id TEXT,
+                nic_ctr_usuario TEXT,
+                nom_cliente TEXT,
+                num_contrato TEXT,
+                qtd_parcela TEXT,
+                val_liquido TEXT,
+                val_emissao TEXT,
+                dat_credito TEXT,
+                link_cmp_pgmt TEXT,
+                has_insurance TEXT,
+                val_seguro TEXT,
+                marital_status TEXT,
+                related_party_key TEXT,
+                first_installment_value TEXT,
+                first_installment_date TEXT,
+                process_id TEXT,
+                unico_score TEXT,
+                serpro_score TEXT,
+                credit_type TEXT,
+                assistance_type TEXT,
+                balance_request_info TEXT,
+                benefit_state TEXT,
+                legal_representative TEXT,
+                created_at TEXT,
+                modified_at TEXT,
+                policy_number TEXT,
+                in100 TEXT,
+                purchaser TEXT,
+                op_stage_id TEXT,
+                requester_identifier_key TEXT,
+                bank_name TEXT,
+                historico_debt_key TEXT,
+                historico_credit_operation_key TEXT,
+                historico_status TEXT,
+                historico_description TEXT,
+                historico_event_datetime TEXT,
+                quantidade_historicos TEXT,
+                PRIMARY KEY ((cpf), debt_key, historico_id)
+            ) WITH CLUSTERING ORDER BY (debt_key ASC, historico_id ASC);
+            """
+            
+            self.session.execute(create_table_query)
+            print(f"✅ Tabela {self.config.CASSANDRA_TABELA} criada/verificada com sucesso")
+            
+        except Exception as e:
+            print(f"❌ Erro ao criar tabela Cassandra: {e}")
+
+    def limpar_tabela(self):
+        """Limpa todos os dados da tabela Cassandra"""
+        if not self.session:
+            return
+        try:
+            query = f"TRUNCATE {self.config.CASSANDRA_TABELA}"
+            self.session.execute(query)
+            print(f"🗑️ Tabela {self.config.CASSANDRA_TABELA} limpa com sucesso no Cassandra")
+        except Exception as e:
+            print(f"❌ Erro ao limpar tabela Cassandra: {e}")
+
+    def inserir_dados(self, df: pd.DataFrame):
+        """Insere dados no Cassandra em lotes"""
+        if not self.session or df.empty:
+            return
+        
+        try:
+            # Prepara a query de inserção
+            colunas = df.columns.tolist()
+            placeholders = ', '.join(['?' for _ in colunas])
+            colunas_str = ', '.join(colunas)
+            query = f"INSERT INTO {self.config.CASSANDRA_TABELA} ({colunas_str}) VALUES ({placeholders})"
+            prepared = self.session.prepare(query)
+            
+            total_registros = len(df)
+            registros_inseridos = 0
+            
+            print(f"📤 Inserindo {total_registros} registros no Cassandra em lotes de {self.config.CASSANDRA_TAMANHO_PACOTE}...")
+            
+            # Processa em lotes
+            for i in range(0, total_registros, self.config.CASSANDRA_TAMANHO_PACOTE):
+                batch = BatchStatement()
+                lote_df = df.iloc[i:i + self.config.CASSANDRA_TAMANHO_PACOTE]
+                
+                for _, row in lote_df.iterrows():
+                    # Converte valores None e NaN para None adequadamente
+                    valores = []
+                    for val in row.values:
+                        if pd.isna(val):
+                            valores.append(None)
+                        else:
+                            valores.append(val)
+                    batch.add(prepared, valores)
+                
+                self.session.execute(batch)
+                registros_inseridos += len(lote_df)
+                
+                if registros_inseridos % (self.config.CASSANDRA_TAMANHO_PACOTE * 5) == 0:
+                    print(f" ... {registros_inseridos}/{total_registros} registros inseridos")
+            
+            print(f"✅ {registros_inseridos} registros inseridos no Cassandra (tabela: {self.config.CASSANDRA_TABELA})")
+            
+        except Exception as e:
+            print(f"❌ Erro ao inserir dados no Cassandra: {e}")
+
+    def fechar_conexao(self):
+        """Fecha a conexão com Cassandra"""
+        if self.cluster:
+            self.cluster.shutdown()
+            print("🔌 Conexão com Cassandra encerrada")
 
 
 # ============================================================================
@@ -367,17 +528,26 @@ def executar_extracao():
     elif config.MODO_CONSULTA == "PERIODO_PERSONALIZADO":
         print(f" 🎯 PERÍODO PERSONALIZADO - {config.DATA_INICIO_PERSONALIZADA} até {config.DATA_FIM_PERSONALIZADA}")
 
-    print(f" 📤 Exportar Excel: {'SIM' if config.EXPORTAR_EXCEL else 'NÃO'}")
-    print(f" 💾 Salvar no banco: {'SIM' if config.USAR_BANCO else 'NÃO'}")
+    print(f" 📤 Exportar Excel/CSV: {'SIM' if config.EXPORTAR_EXCEL else 'NÃO'}")
+    print(f" 💾 Salvar no PostgreSQL: {'SIM' if config.USAR_BANCO else 'NÃO'}")
+    print(f" 🗄️ Salvar no Cassandra: {'SIM' if config.USAR_CASSANDRA else 'NÃO'}")
     print()
 
     api = FintechAPI(config)
     processador = ProcessadorDados()
     banco = GerenciadorBanco(config)
+    cassandra = GerenciadorCassandra(config)
 
     if not api.autenticar():
         print("❌ Falha na autenticação. Abortando.")
         return
+
+    # Limpa tabelas se configurado
+    if config.USAR_BANCO and config.LIMPAR_TABELA_ANTES:
+        banco.limpar_tabela()
+    
+    if config.USAR_CASSANDRA and config.LIMPAR_CASSANDRA_ANTES:
+        cassandra.limpar_tabela()
 
     print("📅 Gerando períodos de consulta...")
     df_periodos = processador.gerar_periodos(config)
@@ -475,13 +645,35 @@ def executar_extracao():
 
     if not todos_registros:
         print("⚠️ Nenhum registro com histórico encontrado")
+        cassandra.fechar_conexao()
         return
 
     df_final = pd.DataFrame(todos_registros)
 
-    caminho = f"{config.CAMINHO_EXCEL}/fintech_extracao.csv"
-    df_final.to_csv(caminho, index=False, sep=";", encoding="utf-8-sig")
-    print(f"📁 Arquivo CSV gerado com sucesso: {caminho}")
+    # Exporta CSV
+    if config.EXPORTAR_EXCEL:
+        # CSV padrão
+        caminho_padrao = f"{config.CAMINHO_EXCEL}/fintech_extracao.csv"
+        df_final.to_csv(caminho_padrao, index=False, sep=";", encoding="utf-8-sig")
+        print(f"📁 Arquivo CSV padrão gerado: {caminho_padrao}")
+        
+        # CSV de saída customizado
+        if config.CAMINHO_CSV_SAIDA:
+            df_final.to_csv(config.CAMINHO_CSV_SAIDA, index=False, sep=";", encoding="utf-8-sig")
+            print(f"📁 Arquivo CSV de saída gerado: {config.CAMINHO_CSV_SAIDA}")
+
+    # Salva no PostgreSQL
+    if config.USAR_BANCO:
+        banco.inserir_dados(df_final)
+
+    # Salva no Cassandra
+    if config.USAR_CASSANDRA:
+        cassandra.inserir_dados(df_final)
+
+    # Fecha conexão Cassandra
+    cassandra.fechar_conexao()
+
+    print("\n✅ Processo finalizado com sucesso!")
 
 if __name__ == "__main__":
     executar_extracao()
