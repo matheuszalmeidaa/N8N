@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import time
+import json
 from sqlalchemy import create_engine, text
 from tqdm import tqdm
 import warnings
@@ -27,37 +28,31 @@ class Config:
     MODO_CONSULTA = "PERIODO_PERSONALIZADO"
 
     # TESTE: um dia só
-    DATA_TESTE = "2025-11-27"
-
+    DATA_TESTE = "2025-03-18"
     # DIA_ESPECIFICO
-    DIA_ESPECIFICO = "2025-11-27"
-
+    DIA_ESPECIFICO = "2025-03-18"
     # MES_ESPECIFICO (MM/YYYY)
     MES_ESPECIFICO = "11/2025"
-
     # ANO_COMPLETO
     ANO_COMPLETO = 2025
-
     # PERIODO_PERSONALIZADO
-    DATA_INICIO_PERSONALIZADA = "2025-03-18"
-    DATA_FIM_PERSONALIZADA = "2025-03-18"
-
+    DATA_INICIO_PERSONALIZADA = "2025-12-01"
+    DATA_FIM_PERSONALIZADA = "2025-12-06"
     # === CONFIGURAÇÃO DE LOTES / DATAS ===
     DIAS_POR_PERIODO = 1        # tamanho do intervalo
     PERIODOS_POR_LOTE = 5       # quantos períodos formam 1 lote
     ORDEM_DATAS = "decrescente" # "crescente" ou "decrescente"
-
     # FILTRO DE LOTE (opcional)
     LOTE_DESEJADO = None  # ex: 1 para só o primeiro lote, ou None para todos
-
     # === DELAYS E PERFORMANCE ===
     DELAY_ENTRE_REQUESTS = 0.2
-    TIMEOUT_REQUEST = 90
+    TIMEOUT_REQUEST = 120
     MOSTRAR_PROGRESSO_BARRA = False
+
 
     # === BANCO DE DADOS POSTGRESQL ===
     USAR_BANCO = False
-    DB_CONNECTION_STRING = "postgresql://usuario:senha@localhost:5432/database"
+    DB_CONNECTION_STRING = "postgresql:/ /usuario:senha@localhost:5432/database"
     TABELA_DESTINO = "fintech_operacoes_mensal"
     LIMPAR_TABELA_ANTES = True
 
@@ -66,13 +61,13 @@ class Config:
     CASSANDRA_HOST = "localhost"
     CASSANDRA_KEYSPACE = "fintech"
     CASSANDRA_TABELA = "fintech_operacoes_mensal"
-    CASSANDRA_TAMANHO_PACOTE = 1000
+    CASSANDRA_TAMANHO_PACOTE = 10
     CASSANDRA_USERNAME = None  # Opcional
     CASSANDRA_PASSWORD = None  # Opcional
-    LIMPAR_CASSANDRA_ANTES = False
+    LIMPAR_CASSANDRA_ANTES = True
 
     # === EXPORTAÇÃO ===
-    EXPORTAR_EXCEL = True
+    EXPORTAR_EXCEL = False
     CAMINHO_EXCEL = "./"
     CAMINHO_CSV_SAIDA = "/root/Debitos/fintech_operacoes_mensal.csv"
 
@@ -86,7 +81,6 @@ class Config:
 # ============================================================================
 
 def extrair_histories(detalhes: dict):
-
     operation = detalhes.get("operation", {}) or {}
 
     histories = []
@@ -138,7 +132,7 @@ class FintechAPI:
                 self.session.headers.update({'Authorization': f'Bearer {self.token}'})
                 print("✅ Autenticação realizada com sucesso!")
                 try:
-                    print(f" Token: {self.token[:20]}...{self.token[-10:]}\n")
+                    print(f"   Token: {self.token[:20]}...{self.token[-10:]}\n")
                 except:
                     pass
                 return True
@@ -147,7 +141,7 @@ class FintechAPI:
                 return False
         except requests.exceptions.HTTPError as e:
             print(f"❌ Erro HTTP na autenticação: {e}")
-            print(f" Status code: {response.status_code}")
+            print(f"   Status code: {response.status_code}")
             return False
         except Exception as e:
             print(f"❌ Erro na autenticação: {e}")
@@ -167,7 +161,7 @@ class FintechAPI:
             operacoes = data.get('operacoes', []) or data.get('operations', [])
             return operacoes
         except Exception as e:
-            print(f" ❌ Erro ao consultar operações: {e}")
+            print(f"   ❌ Erro ao consultar operações: {e}")
             return None
 
     def consultar_detalhes_operacao(self, debt_key: str, credit_operation_key: str = None) -> Optional[Dict]:
@@ -260,12 +254,22 @@ class ProcessadorDados:
         if not histories:
             return []
 
+        # ORDENAR HISTÓRICOS POR DATA/HORA (DECRESCENTE - MAIS RECENTE PRIMEIRO)
+        try:
+            histories_ordenados = sorted(
+                histories,
+                key=lambda h: h.get('event_datetime') or '',
+                reverse=True  # Decrescente: mais recente primeiro
+            )
+        except Exception:
+            histories_ordenados = histories  # Se falhar, usa ordem original
+
         data_formatada = ProcessadorDados.formatar_data_completa(
             operacao.get('dat_emprestimo')
         )
 
         registros = []
-        for hist in histories:
+        for idx, hist in enumerate(histories_ordenados, start=1):
             registro = {
                 'cpf': operacao.get('cpf') or operation_data.get('cpf'),
                 'dat_emprestimo_completo': data_formatada,
@@ -306,13 +310,13 @@ class ProcessadorDados:
                 'requester_identifier_key': operation_data.get('requester_identifier_key'),
                 'bank_name': operation_data.get('bank_name'),
 
+                'historico_sequencia': idx,  # ← NOVA COLUNA: ordem do histórico
                 'historico_id': hist.get('id'),
                 'historico_debt_key': hist.get('debt_key'),
                 'historico_credit_operation_key': hist.get('credit_operation_key'),
                 'historico_status': hist.get('status'),
                 'historico_description': hist.get('description'),
                 'historico_event_datetime': hist.get('event_datetime'),
-                ##'quantidade_historicos': len(histories),
             }
             registros.append(registro)
 
@@ -339,7 +343,7 @@ class GerenciadorBanco:
             with self.engine.connect() as conn:
                 conn.execute(text(f"DELETE FROM {self.config.TABELA_DESTINO}"))
                 conn.commit()
-                print(f"🗑️ Tabela {self.config.TABELA_DESTINO} limpa com sucesso")
+                print(f"🗑️  Tabela {self.config.TABELA_DESTINO} limpa com sucesso")
         except Exception as e:
             print(f"❌ Erro ao limpar tabela: {e}")
 
@@ -386,17 +390,56 @@ class GerenciadorCassandra:
         try:
             query = f"TRUNCATE {self.config.CASSANDRA_TABELA}"
             self.session.execute(query)
-            print(f"🗑️ Tabela {self.config.CASSANDRA_TABELA} limpa com sucesso no Cassandra")
+            print(f"🗑️  Tabela {self.config.CASSANDRA_TABELA} limpa com sucesso no Cassandra")
         except Exception as e:
             print(f"❌ Erro ao limpar tabela Cassandra: {e}")
 
+    def converter_para_texto(self, valor):
+        """
+        Converte qualquer valor para texto (string)
+        TUDO vai como TEXT para o Cassandra - sem tratamento de tipos
+        """
+        if valor is None:
+            return None
+        
+        # Se é dict ou list, converter para JSON string
+        if isinstance(valor, (dict, list)):
+            return json.dumps(valor, ensure_ascii=False)
+        
+        # Converter para string
+        valor_str = str(valor)
+        
+        # Se for string vazia, retornar None
+        if valor_str.strip() == '':
+            return None
+        
+        return valor_str
+
+    def converter_tipos_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Converte TUDO para texto - sem exceções
+        A tabela Cassandra deve ter todas as colunas como TEXT
+        """
+        df_convertido = df.copy()
+        
+        print("   🔄 Convertendo TODOS os campos para TEXT...")
+        
+        # Aplicar conversão para texto em TODAS as colunas
+        for col in df_convertido.columns:
+            df_convertido[col] = df_convertido[col].apply(self.converter_para_texto)
+        
+        return df_convertido
+
     def inserir_dados(self, df: pd.DataFrame):
-        """Insere dados no Cassandra em lotes"""
+        """Insere dados no Cassandra em lotes - TUDO COMO TEXTO"""
         if not self.session or df.empty:
             return
         
         try:
-            # Prepara a query de inserção
+            # Converter tudo para texto
+            print("🔄 Preparando dados para Cassandra (modo TEXT)...")
+            df = self.converter_tipos_dataframe(df)
+            
             colunas = df.columns.tolist()
             placeholders = ', '.join(['?' for _ in colunas])
             colunas_str = ', '.join(colunas)
@@ -408,31 +451,26 @@ class GerenciadorCassandra:
             
             print(f"📤 Inserindo {total_registros} registros no Cassandra em lotes de {self.config.CASSANDRA_TAMANHO_PACOTE}...")
             
-            # Processa em lotes
             for i in range(0, total_registros, self.config.CASSANDRA_TAMANHO_PACOTE):
                 batch = BatchStatement()
                 lote_df = df.iloc[i:i + self.config.CASSANDRA_TAMANHO_PACOTE]
                 
-                for _, row in lote_df.iterrows():
-                    # Converte valores None e NaN para None adequadamente
-                    valores = []
-                    for val in row.values:
-                        if pd.isna(val):
-                            valores.append(None)
-                        else:
-                            valores.append(val)
+                for idx, row in lote_df.iterrows():
+                    valores = list(row.values)
                     batch.add(prepared, valores)
                 
                 self.session.execute(batch)
                 registros_inseridos += len(lote_df)
                 
                 if registros_inseridos % (self.config.CASSANDRA_TAMANHO_PACOTE * 5) == 0:
-                    print(f" ... {registros_inseridos}/{total_registros} registros inseridos")
+                    print(f"   ... {registros_inseridos}/{total_registros} registros inseridos")
             
             print(f"✅ {registros_inseridos} registros inseridos no Cassandra (tabela: {self.config.CASSANDRA_TABELA})")
             
         except Exception as e:
             print(f"❌ Erro ao inserir dados no Cassandra: {e}")
+            import traceback
+            traceback.print_exc()
 
     def fechar_conexao(self):
         """Fecha a conexão com Cassandra"""
@@ -453,22 +491,22 @@ def executar_extracao():
 
     config = Config()
 
-    print("⚙️ MODO DE OPERAÇÃO ATIVO:")
+    print("⚙️  MODO DE OPERAÇÃO ATIVO:")
     if config.MODO_CONSULTA == "TESTE":
-        print(f" 🧪 TESTE - Consultando apenas o dia {config.DATA_TESTE}")
-        print(" (Modo rápido para validar se o sistema está funcionando)")
+        print(f"   🧪 TESTE - Consultando apenas o dia {config.DATA_TESTE}")
+        print("   (Modo rápido para validar se o sistema está funcionando)")
     elif config.MODO_CONSULTA == "DIA_ESPECIFICO":
-        print(f" 📅 DIA ESPECÍFICO - {config.DIA_ESPECIFICO}")
+        print(f"   📅 DIA ESPECÍFICO - {config.DIA_ESPECIFICO}")
     elif config.MODO_CONSULTA == "MES_ESPECIFICO":
-        print(f" 📆 MÊS ESPECÍFICO - {config.MES_ESPECIFICO}")
+        print(f"   📆 MÊS ESPECÍFICO - {config.MES_ESPECIFICO}")
     elif config.MODO_CONSULTA == "ANO_COMPLETO":
-        print(f" 📊 ANO COMPLETO - {config.ANO_COMPLETO}")
+        print(f"   📊 ANO COMPLETO - {config.ANO_COMPLETO}")
     elif config.MODO_CONSULTA == "PERIODO_PERSONALIZADO":
-        print(f" 🎯 PERÍODO PERSONALIZADO - {config.DATA_INICIO_PERSONALIZADA} até {config.DATA_FIM_PERSONALIZADA}")
+        print(f"   🎯 PERÍODO PERSONALIZADO - {config.DATA_INICIO_PERSONALIZADA} até {config.DATA_FIM_PERSONALIZADA}")
 
-    print(f" 📤 Exportar Excel/CSV: {'SIM' if config.EXPORTAR_EXCEL else 'NÃO'}")
-    print(f" 💾 Salvar no PostgreSQL: {'SIM' if config.USAR_BANCO else 'NÃO'}")
-    print(f" 🗄️ Salvar no Cassandra: {'SIM' if config.USAR_CASSANDRA else 'NÃO'}")
+    print(f"   📤 Exportar Excel/CSV: {'SIM' if config.EXPORTAR_EXCEL else 'NÃO'}")
+    print(f"   💾 Salvar no PostgreSQL: {'SIM' if config.USAR_BANCO else 'NÃO'}")
+    print(f"   🗄️  Salvar no Cassandra: {'SIM' if config.USAR_CASSANDRA else 'NÃO'}")
     print()
 
     api = FintechAPI(config)
@@ -480,7 +518,6 @@ def executar_extracao():
         print("❌ Falha na autenticação. Abortando.")
         return
 
-    # Limpa tabelas se configurado
     if config.USAR_BANCO and config.LIMPAR_TABELA_ANTES:
         banco.limpar_tabela()
     
@@ -489,10 +526,10 @@ def executar_extracao():
 
     print("📅 Gerando períodos de consulta...")
     df_periodos = processador.gerar_periodos(config)
-    print(f" ✓ {len(df_periodos)} períodos gerados\n")
+    print(f"   ✓ {len(df_periodos)} períodos gerados\n")
 
     if df_periodos.empty:
-        print("⚠️ Nenhum período encontrado com os filtros aplicados")
+        print("⚠️  Nenhum período encontrado com os filtros aplicados")
         return
 
     todos_registros = []
@@ -505,12 +542,12 @@ def executar_extracao():
 
         operacoes = api.consultar_operacoes(periodo['data_inicio'], periodo['data_fim'])
         if not operacoes:
-            print(" ⚠️ Nenhuma operação encontrada\n")
+            print("   ⚠️  Nenhuma operação encontrada\n")
             continue
 
         operacoes_validas = [op for op in operacoes if op.get('cpf')]
         total_operacoes += len(operacoes)
-        print(f" ✓ {len(operacoes_validas)} operações válidas encontradas")
+        print(f"   ✓ {len(operacoes_validas)} operações válidas encontradas")
 
         sucesso = 0
         com_historico = 0
@@ -519,7 +556,7 @@ def executar_extracao():
 
         if config.MOSTRAR_PROGRESSO_BARRA:
             pbar = tqdm(operacoes_validas,
-                        desc=" 📥 Detalhes",
+                        desc="   📥 Detalhes",
                         unit="op",
                         ncols=100,
                         colour='cyan',
@@ -545,10 +582,13 @@ def executar_extracao():
                     erros += 1
                 time.sleep(config.DELAY_ENTRE_REQUESTS)
         else:
-            print(f" 📥 Consultando detalhes de {len(operacoes_validas)} operações...")
+            if config.MOSTRAR_LOGS_DETALHADOS:
+                print(f"   📥 Consultando detalhes de {len(operacoes_validas)} operações...")
+            
             for i, op in enumerate(operacoes_validas, 1):
-                if i % 50 == 0:
-                    print(f" ... {i}/{len(operacoes_validas)} (✓{com_historico} com hist | ○{sem_historico} sem hist)")
+                if config.MOSTRAR_LOGS_DETALHADOS and i % 50 == 0:
+                    print(f"   ... {i}/{len(operacoes_validas)} (✓{com_historico} com hist | ○{sem_historico} sem hist)")
+                
                 try:
                     detalhes = api.consultar_detalhes_operacao(
                         op.get('debt_key'),
@@ -568,7 +608,7 @@ def executar_extracao():
                     erros += 1
                 time.sleep(config.DELAY_ENTRE_REQUESTS)
 
-        print(f" 📊 ✓ {com_historico} com histórico | ○ {sem_historico} sem histórico | ✗ {erros} erros")
+        print(f"   📊 ✓ {com_historico} com histórico | ○ {sem_historico} sem histórico | ✗ {erros} erros")
         print()
 
     tempo_total = time.time() - tempo_inicio
@@ -576,39 +616,33 @@ def executar_extracao():
     print("="*80)
     print("📊 RESUMO DA EXTRAÇÃO")
     print("="*80)
-    print(f" ⏱️ Tempo total: {tempo_total:.1f} segundos ({tempo_total/60:.1f} minutos)")
-    print(f" 📋 Total de operações consultadas (API 1): {total_operacoes}")
-    print(f" 📝 Total de registros gerados (com históricos): {len(todos_registros)}")
+    print(f"   ⏱️  Tempo total: {tempo_total:.1f} segundos ({tempo_total/60:.1f} minutos)")
+    print(f"   📋 Total de operações consultadas (API 1): {total_operacoes}")
+    print(f"   📝 Total de registros gerados (com históricos): {len(todos_registros)}")
     print()
 
     if not todos_registros:
-        print("⚠️ Nenhum registro com histórico encontrado")
+        print("⚠️  Nenhum registro com histórico encontrado")
         cassandra.fechar_conexao()
         return
 
     df_final = pd.DataFrame(todos_registros)
 
-    # Exporta CSV
     if config.EXPORTAR_EXCEL:
-        # CSV padrão
         caminho_padrao = f"{config.CAMINHO_EXCEL}/fintech_extracao.csv"
         df_final.to_csv(caminho_padrao, index=False, sep=";", encoding="utf-8-sig")
         print(f"📁 Arquivo CSV padrão gerado: {caminho_padrao}")
         
-        # CSV de saída customizado
         if config.CAMINHO_CSV_SAIDA:
             df_final.to_csv(config.CAMINHO_CSV_SAIDA, index=False, sep=";", encoding="utf-8-sig")
             print(f"📁 Arquivo CSV de saída gerado: {config.CAMINHO_CSV_SAIDA}")
 
-    # Salva no PostgreSQL
     if config.USAR_BANCO:
         banco.inserir_dados(df_final)
 
-    # Salva no Cassandra
     if config.USAR_CASSANDRA:
         cassandra.inserir_dados(df_final)
 
-    # Fecha conexão Cassandra
     cassandra.fechar_conexao()
 
     print("\n✅ Processo finalizado com sucesso!")
