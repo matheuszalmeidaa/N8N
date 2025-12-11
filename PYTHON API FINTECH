@@ -4,12 +4,11 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import time
 import json
-from sqlalchemy import create_engine, text
 from tqdm import tqdm
 import warnings
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
-from cassandra.query import BatchStatement, SimpleStatement
+from cassandra.query import BatchStatement
 
 warnings.filterwarnings('ignore')
 
@@ -28,7 +27,7 @@ class Config:
     MODO_CONSULTA = "PERIODO_PERSONALIZADO"
 
     # TESTE: um dia só
-    DATA_TESTE = "2025-03-18"
+    DATA_TESTE = "2025-12-08"
     # DIA_ESPECIFICO
     DIA_ESPECIFICO = "2025-03-18"
     # MES_ESPECIFICO (MM/YYYY)
@@ -36,25 +35,19 @@ class Config:
     # ANO_COMPLETO
     ANO_COMPLETO = 2025
     # PERIODO_PERSONALIZADO
-    DATA_INICIO_PERSONALIZADA = "2025-12-01"
-    DATA_FIM_PERSONALIZADA = "2025-12-06"
+    DATA_INICIO_PERSONALIZADA = "2025-11-01"
+    DATA_FIM_PERSONALIZADA = "2025-12-10"
+    
     # === CONFIGURAÇÃO DE LOTES / DATAS ===
-    DIAS_POR_PERIODO = 1        # tamanho do intervalo
-    PERIODOS_POR_LOTE = 5       # quantos períodos formam 1 lote
-    ORDEM_DATAS = "decrescente" # "crescente" ou "decrescente"
-    # FILTRO DE LOTE (opcional)
-    LOTE_DESEJADO = None  # ex: 1 para só o primeiro lote, ou None para todos
+    DIAS_POR_PERIODO = 1
+    PERIODOS_POR_LOTE = 5
+    ORDEM_DATAS = "decrescente"
+    LOTE_DESEJADO = None
+    
     # === DELAYS E PERFORMANCE ===
     DELAY_ENTRE_REQUESTS = 0.2
     TIMEOUT_REQUEST = 120
     MOSTRAR_PROGRESSO_BARRA = False
-
-
-    # === BANCO DE DADOS POSTGRESQL ===
-    USAR_BANCO = False
-    DB_CONNECTION_STRING = "postgresql:/ /usuario:senha@localhost:5432/database"
-    TABELA_DESTINO = "fintech_operacoes_mensal"
-    LIMPAR_TABELA_ANTES = True
 
     # === CASSANDRA ===
     USAR_CASSANDRA = True
@@ -62,18 +55,97 @@ class Config:
     CASSANDRA_KEYSPACE = "fintech"
     CASSANDRA_TABELA = "fintech_operacoes_mensal"
     CASSANDRA_TAMANHO_PACOTE = 10
-    CASSANDRA_USERNAME = None  # Opcional
-    CASSANDRA_PASSWORD = None  # Opcional
+    CASSANDRA_USERNAME = None
+    CASSANDRA_PASSWORD = None
     LIMPAR_CASSANDRA_ANTES = True
-
-    # === EXPORTAÇÃO ===
-    EXPORTAR_EXCEL = False
-    CAMINHO_EXCEL = "./"
-    CAMINHO_CSV_SAIDA = "/root/Debitos/fintech_operacoes_mensal.csv"
 
     # === LOGS ===
     MOSTRAR_CONFIG_INICIAL = True
     MOSTRAR_LOGS_DETALHADOS = False
+
+
+# ============================================================================
+# DICIONÁRIOS DE TRADUÇÃO
+# ============================================================================
+
+TRADUCOES = {
+    'credit_type': {
+        'checking_account': 'Conta Corrente',
+        'magnetic_card': 'Cartão Magnético',
+        'saving_account': 'Conta Poupança'
+    },
+    'assistance_type': {
+        'pension_by_death': 'Pensão por Morte',
+        'pension_by_death_statute': 'Pensão por Morte Estatutária',
+        'pension_by_death_work_accident': 'Pensão por Morte Acidente de Trabalho',
+        'retirement_by_age': 'Aposentadoria por Idade',
+        'retirement_by_contribution_time': 'Aposentadoria por Tempo de Contribuição',
+        'retirement_by_teacher_labor_time': 'Aposentadoria por Tempo de Magistério',
+        'retirement_invalidity_accident_rural_worker': 'Aposentadoria por Invalidez Acidente Trabalhador Rural',
+        'retirement_invalidity_rural_emploee': 'Aposentadoria por Invalidez Empregado Rural',
+        'retirement_invalidity_social_security': 'Aposentadoria por Invalidez Previdenciária',
+        'retirement_invalidity_work_accident': 'Aposentadoria por Invalidez Acidente de Trabalho',
+        'retirement_special': 'Aposentadoria Especial'
+    },
+    'dsc_situacao_emprestimo': {
+        'waiting_signature': 'Aguardando Assinatura',
+        'canceled_permanently': 'Cancelado Permanentemente'
+    },
+    'has_insurance': {
+        'False': 'Não Contém',
+        'True': 'Contém',
+        False: 'Não Contém',
+        True: 'Contém'
+    },
+    'marital_status': {
+        'divorced': 'Divorciado(a)',
+        'married': 'Casado(a)',
+        'single': 'Solteiro(a)',
+        'widower': 'Viúvo(a)'
+    }
+}
+
+
+# ============================================================================
+# FUNÇÕES DE TRADUÇÃO E FORMATAÇÃO
+# ============================================================================
+
+def traduzir_campo(valor, tipo_campo):
+    """Traduz um valor usando o dicionário apropriado"""
+    if valor is None or pd.isna(valor):
+        return valor
+    
+    # Converter para string para comparação
+    valor_str = str(valor).strip()
+    
+    if tipo_campo in TRADUCOES:
+        return TRADUCOES[tipo_campo].get(valor_str, valor)
+    
+    return valor
+
+
+def formatar_valor_monetario(valor):
+    """
+    Converte valor numérico para formato brasileiro: 1.000,02
+    Mantém como string para preservar formatação no Cassandra
+    """
+    if valor is None or pd.isna(valor):
+        return None
+    
+    try:
+        # Converter para float primeiro
+        if isinstance(valor, str):
+            # Remove espaços e troca vírgula por ponto se necessário
+            valor = valor.replace(' ', '').replace(',', '.')
+        
+        valor_float = float(valor)
+        
+        # Formatar no padrão brasileiro
+        valor_formatado = f"{valor_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        
+        return valor_formatado
+    except (ValueError, TypeError):
+        return valor
 
 
 # ============================================================================
@@ -254,15 +326,15 @@ class ProcessadorDados:
         if not histories:
             return []
 
-        # ORDENAR HISTÓRICOS POR DATA/HORA (DECRESCENTE - MAIS RECENTE PRIMEIRO)
+        # ORDENAR HISTÓRICOS POR DATA/HORA (CRESCENTE - MAIS ANTIGO PRIMEIRO)
         try:
             histories_ordenados = sorted(
                 histories,
                 key=lambda h: h.get('event_datetime') or '',
-                reverse=True  # Decrescente: mais recente primeiro
+                reverse=False
             )
         except Exception:
-            histories_ordenados = histories  # Se falhar, usa ordem original
+            histories_ordenados = histories
 
         data_formatada = ProcessadorDados.formatar_data_completa(
             operacao.get('dat_emprestimo')
@@ -310,7 +382,7 @@ class ProcessadorDados:
                 'requester_identifier_key': operation_data.get('requester_identifier_key'),
                 'bank_name': operation_data.get('bank_name'),
 
-                'historico_sequencia': idx,  # ← NOVA COLUNA: ordem do histórico
+                'historico_sequencia_tmp': idx,
                 'historico_id': hist.get('id'),
                 'historico_debt_key': hist.get('debt_key'),
                 'historico_credit_operation_key': hist.get('credit_operation_key'),
@@ -321,40 +393,6 @@ class ProcessadorDados:
             registros.append(registro)
 
         return registros
-
-
-class GerenciadorBanco:
-    """Gerencia operações com banco de dados PostgreSQL"""
-
-    def __init__(self, config: Config):
-        self.config = config
-        self.engine = None
-        if config.USAR_BANCO:
-            try:
-                self.engine = create_engine(config.DB_CONNECTION_STRING)
-                print("✅ Conexão com banco PostgreSQL estabelecida")
-            except Exception as e:
-                print(f"❌ Erro ao conectar no banco PostgreSQL: {e}")
-
-    def limpar_tabela(self):
-        if not self.engine:
-            return
-        try:
-            with self.engine.connect() as conn:
-                conn.execute(text(f"DELETE FROM {self.config.TABELA_DESTINO}"))
-                conn.commit()
-                print(f"🗑️  Tabela {self.config.TABELA_DESTINO} limpa com sucesso")
-        except Exception as e:
-            print(f"❌ Erro ao limpar tabela: {e}")
-
-    def inserir_dados(self, df: pd.DataFrame):
-        if not self.engine or df.empty:
-            return
-        try:
-            df.to_sql(self.config.TABELA_DESTINO, self.engine, if_exists='append', index=False)
-            print(f"✅ {len(df)} registros inseridos na tabela {self.config.TABELA_DESTINO}")
-        except Exception as e:
-            print(f"❌ Erro ao inserir dados: {e}")
 
 
 class GerenciadorCassandra:
@@ -395,36 +433,31 @@ class GerenciadorCassandra:
             print(f"❌ Erro ao limpar tabela Cassandra: {e}")
 
     def converter_para_texto(self, valor):
-        """
-        Converte qualquer valor para texto (string)
-        TUDO vai como TEXT para o Cassandra - sem tratamento de tipos
-        """
+        """Converte qualquer valor para texto (string)"""
         if valor is None:
             return None
         
-        # Se é dict ou list, converter para JSON string
+        if isinstance(valor, str):
+            if valor.strip() == '':
+                return None
+            return valor
+        
         if isinstance(valor, (dict, list)):
             return json.dumps(valor, ensure_ascii=False)
         
-        # Converter para string
         valor_str = str(valor)
         
-        # Se for string vazia, retornar None
         if valor_str.strip() == '':
             return None
         
         return valor_str
 
     def converter_tipos_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Converte TUDO para texto - sem exceções
-        A tabela Cassandra deve ter todas as colunas como TEXT
-        """
+        """Converte TUDO para texto - sem exceções"""
         df_convertido = df.copy()
         
         print("   🔄 Convertendo TODOS os campos para TEXT...")
         
-        # Aplicar conversão para texto em TODAS as colunas
         for col in df_convertido.columns:
             df_convertido[col] = df_convertido[col].apply(self.converter_para_texto)
         
@@ -436,7 +469,6 @@ class GerenciadorCassandra:
             return
         
         try:
-            # Converter tudo para texto
             print("🔄 Preparando dados para Cassandra (modo TEXT)...")
             df = self.converter_tipos_dataframe(df)
             
@@ -504,23 +536,17 @@ def executar_extracao():
     elif config.MODO_CONSULTA == "PERIODO_PERSONALIZADO":
         print(f"   🎯 PERÍODO PERSONALIZADO - {config.DATA_INICIO_PERSONALIZADA} até {config.DATA_FIM_PERSONALIZADA}")
 
-    print(f"   📤 Exportar Excel/CSV: {'SIM' if config.EXPORTAR_EXCEL else 'NÃO'}")
-    print(f"   💾 Salvar no PostgreSQL: {'SIM' if config.USAR_BANCO else 'NÃO'}")
     print(f"   🗄️  Salvar no Cassandra: {'SIM' if config.USAR_CASSANDRA else 'NÃO'}")
     print()
 
     api = FintechAPI(config)
     processador = ProcessadorDados()
-    banco = GerenciadorBanco(config)
     cassandra = GerenciadorCassandra(config)
 
     if not api.autenticar():
         print("❌ Falha na autenticação. Abortando.")
         return
 
-    if config.USAR_BANCO and config.LIMPAR_TABELA_ANTES:
-        banco.limpar_tabela()
-    
     if config.USAR_CASSANDRA and config.LIMPAR_CASSANDRA_ANTES:
         cassandra.limpar_tabela()
 
@@ -588,7 +614,7 @@ def executar_extracao():
             for i, op in enumerate(operacoes_validas, 1):
                 if config.MOSTRAR_LOGS_DETALHADOS and i % 50 == 0:
                     print(f"   ... {i}/{len(operacoes_validas)} (✓{com_historico} com hist | ○{sem_historico} sem hist)")
-                
+
                 try:
                     detalhes = api.consultar_detalhes_operacao(
                         op.get('debt_key'),
@@ -628,24 +654,112 @@ def executar_extracao():
 
     df_final = pd.DataFrame(todos_registros)
 
-    if config.EXPORTAR_EXCEL:
-        caminho_padrao = f"{config.CAMINHO_EXCEL}/fintech_extracao.csv"
-        df_final.to_csv(caminho_padrao, index=False, sep=";", encoding="utf-8-sig")
-        print(f"📁 Arquivo CSV padrão gerado: {caminho_padrao}")
-        
-        if config.CAMINHO_CSV_SAIDA:
-            df_final.to_csv(config.CAMINHO_CSV_SAIDA, index=False, sep=";", encoding="utf-8-sig")
-            print(f"📁 Arquivo CSV de saída gerado: {config.CAMINHO_CSV_SAIDA}")
+    # ---------------------------
+    # APLICAR TRADUÇÕES E FORMATAÇÕES
+    # ---------------------------
+    print("🌐 Aplicando traduções e formatações...")
+    
+    # Traduzir campos
+    if 'credit_type' in df_final.columns:
+        df_final['credit_type'] = df_final['credit_type'].apply(
+            lambda x: traduzir_campo(x, 'credit_type')
+        )
+    
+    if 'assistance_type' in df_final.columns:
+        df_final['assistance_type'] = df_final['assistance_type'].apply(
+            lambda x: traduzir_campo(x, 'assistance_type')
+        )
+    
+    if 'dsc_situacao_emprestimo' in df_final.columns:
+        df_final['dsc_situacao_emprestimo'] = df_final['dsc_situacao_emprestimo'].apply(
+            lambda x: traduzir_campo(x, 'dsc_situacao_emprestimo')
+        )
+    
+    if 'has_insurance' in df_final.columns:
+        df_final['has_insurance'] = df_final['has_insurance'].apply(
+            lambda x: traduzir_campo(x, 'has_insurance')
+        )
+    
+    if 'marital_status' in df_final.columns:
+        df_final['marital_status'] = df_final['marital_status'].apply(
+            lambda x: traduzir_campo(x, 'marital_status')
+        )
+    
+    # Formatar valores monetários para padrão brasileiro (1.000,02)
+    campos_monetarios = ['val_emissao', 'val_liquido', 'val_seguro','first_installment_value']
+    for campo in campos_monetarios:
+        if campo in df_final.columns:
+            df_final[campo] = df_final[campo].apply(formatar_valor_monetario)
+    
+    print("   ✓ Traduções aplicadas:")
+    print("      - credit_type (tipos de crédito)")
+    print("      - assistance_type (tipos de benefício)")
+    print("      - dsc_situacao_emprestimo (situações)")
+    print("      - has_insurance (Sim/Não)")
+    print("      - marital_status (estado civil)")
+    print("   ✓ Valores formatados: val_emissao, val_liquido, val_seguro (formato: 1.000,02)")
 
-    if config.USAR_BANCO:
-        banco.inserir_dados(df_final)
+    # ---------------------------
+    # RECOMPUTAR historico_sequencia POR PROPOSTA COM ZERO PADDING
+    # ---------------------------
+    print("🔄 Recalculando sequências de histórico com zero padding...")
+    
+    if 'historico_event_datetime' in df_final.columns:
+        df_final['historico_event_datetime'] = pd.to_datetime(
+            df_final['historico_event_datetime'], errors='coerce'
+        )
 
+    group_keys = ['debt_key']
+    if 'historico_credit_operation_key' in df_final.columns:
+        df_final['historico_credit_operation_key'] = df_final['historico_credit_operation_key'].fillna('')
+        if df_final['historico_credit_operation_key'].str.strip().replace('', pd.NA).notna().any():
+            group_keys = ['debt_key', 'historico_credit_operation_key']
+
+    if 'historico_event_datetime' in df_final.columns:
+        sort_asc = [True] * len(group_keys) + [False]
+        sort_cols = group_keys + ['historico_event_datetime']
+        df_final = df_final.sort_values(sort_cols, ascending=sort_asc).reset_index(drop=True)
+    else:
+        sort_cols = group_keys.copy()
+        if 'historico_id' in df_final.columns:
+            sort_cols.append('historico_id')
+        df_final = df_final.sort_values(sort_cols).reset_index(drop=True)
+
+    df_final['historico_sequencia_num'] = df_final.groupby(group_keys).cumcount() + 1
+    
+    max_por_grupo = df_final.groupby(group_keys)['historico_sequencia_num'].transform('max')
+    
+    def calcular_padding(row):
+        max_val = max_por_grupo.iloc[row.name]
+        num_digitos = len(str(int(max_val)))
+        num_digitos = max(2, num_digitos)
+        sequencia = str(int(row['historico_sequencia_num'])).zfill(num_digitos)
+        sequencia = sequencia + '*'
+        return sequencia
+    
+    df_final['historico_sequencia'] = df_final.apply(calcular_padding, axis=1)
+    
+    df_final.drop(columns=['historico_sequencia_num', 'historico_sequencia_tmp'], inplace=True, errors='ignore')
+    
+    exemplos = df_final['historico_sequencia'].head(15).tolist()
+    print(f"   📋 Exemplos de sequências geradas: {exemplos}")
+    print(f"   ⭐ Asterisco (*) em todos os registros para garantir ordenação correta no BI")
+    
+    print(f"   ✓ Sequências recalculadas (formato: 01*, 02*, 03*... para melhor compatibilidade com BI)")
+
+    # ---------------------------
+    # Inserir no Cassandra
+    # ---------------------------
     if config.USAR_CASSANDRA:
         cassandra.inserir_dados(df_final)
 
     cassandra.fechar_conexao()
 
     print("\n✅ Processo finalizado com sucesso!")
+    print("📝 Resumo das transformações aplicadas:")
+    print("   ✓ Campos traduzidos para português")
+    print("   ✓ Valores monetários no formato brasileiro (1.000,02)")
+    print("   ✓ Sequências com zero padding e asterisco para ordenação")
 
 if __name__ == "__main__":
     executar_extracao()
