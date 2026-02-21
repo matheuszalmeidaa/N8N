@@ -1,6 +1,6 @@
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta  
 from typing import List, Dict, Optional
 import time
 import json
@@ -29,23 +29,23 @@ class Config:
     # TESTE: um dia só
     DATA_TESTE = "2025-12-08"
     # DIA_ESPECIFICO
-    DIA_ESPECIFICO = "2025-03-18"
+    DIA_ESPECIFICO = "2026-01-22"
     # MES_ESPECIFICO (MM/YYYY)
     MES_ESPECIFICO = "11/2025"
     # ANO_COMPLETO
     ANO_COMPLETO = 2025
     # PERIODO_PERSONALIZADO
-    DATA_INICIO_PERSONALIZADA = "2025-11-01"
-    DATA_FIM_PERSONALIZADA = "2025-12-10"
+    DATA_INICIO_PERSONALIZADA = "2026-01-01"
+    DATA_FIM_PERSONALIZADA = datetime.now().strftime("%Y-%m-%d")
     
     # === CONFIGURAÇÃO DE LOTES / DATAS ===
     DIAS_POR_PERIODO = 1
     PERIODOS_POR_LOTE = 5
-    ORDEM_DATAS = "decrescente"
+    ORDEM_DATAS = "crescente"
     LOTE_DESEJADO = None
     
     # === DELAYS E PERFORMANCE ===
-    DELAY_ENTRE_REQUESTS = 0.2
+    DELAY_ENTRE_REQUESTS = 0.01
     TIMEOUT_REQUEST = 120
     MOSTRAR_PROGRESSO_BARRA = False
 
@@ -107,6 +107,34 @@ TRADUCOES = {
 
 
 # ============================================================================
+# LISTA DE CAMPOS NUMÉRICOS (TODOS)
+# ============================================================================
+
+CAMPOS_NUMERICOS = [
+    # Valores monetários principais
+    'val_liquido',
+    'val_emissao',
+    'val_seguro',
+    'first_installment_value',
+    
+    # IDs e códigos numéricos
+    'id',
+    'historico_id',
+    'qtd_parcela',
+    'op_stage_id',
+    'process_id',
+    
+    # Scores
+    'unico_score',
+    'serpro_score',
+    
+    # Outros campos numéricos
+    'in100',
+    'policy_number'
+]
+
+
+# ============================================================================
 # FUNÇÕES DE TRADUÇÃO E FORMATAÇÃO
 # ============================================================================
 
@@ -115,7 +143,6 @@ def traduzir_campo(valor, tipo_campo):
     if valor is None or pd.isna(valor):
         return valor
     
-    # Converter para string para comparação
     valor_str = str(valor).strip()
     
     if tipo_campo in TRADUCOES:
@@ -124,28 +151,56 @@ def traduzir_campo(valor, tipo_campo):
     return valor
 
 
-def formatar_valor_monetario(valor):
+def normalizar_numero(valor):
     """
-    Converte valor numérico para formato brasileiro: 1.000,02
-    Mantém como string para preservar formatação no Cassandra
+    Converte qualquer valor numérico para string com ponto decimal (padrão internacional)
+    Exemplos:
+        1643.06 → "1643.06"
+        "1.643,06" → "1643.06"
+        1643 → "1643"
+        None → None
     """
     if valor is None or pd.isna(valor):
         return None
     
-    try:
-        # Converter para float primeiro
-        if isinstance(valor, str):
-            # Remove espaços e troca vírgula por ponto se necessário
-            valor = valor.replace(' ', '').replace(',', '.')
+    # Se já é número (int ou float)
+    if isinstance(valor, (int, float)):
+        # Converter para string mantendo ponto decimal
+        if isinstance(valor, int):
+            return str(valor)
+        else:
+            # Float: remover trailing zeros desnecessários
+            valor_str = f"{valor:.10f}".rstrip('0').rstrip('.')
+            return valor_str
+    
+    # Se é string
+    if isinstance(valor, str):
+        valor = valor.strip()
         
-        valor_float = float(valor)
+        # Se está vazio
+        if valor == '':
+            return None
         
-        # Formatar no padrão brasileiro
-        valor_formatado = f"{valor_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        # Se está no formato brasileiro (1.643,06)
+        if ',' in valor:
+            # Remover pontos de milhar e trocar vírgula por ponto
+            valor = valor.replace('.', '').replace(',', '.')
         
-        return valor_formatado
-    except (ValueError, TypeError):
-        return valor
+        # Tentar converter para float e depois para string
+        try:
+            valor_float = float(valor)
+            if valor_float == int(valor_float):
+                return str(int(valor_float))
+            else:
+                # Remover trailing zeros
+                valor_str = f"{valor_float:.10f}".rstrip('0').rstrip('.')
+                return valor_str
+        except (ValueError, TypeError):
+            # Se não conseguir converter, retornar original
+            return valor
+    
+    # Outros tipos: converter para string
+    return str(valor)
 
 
 # ============================================================================
@@ -220,21 +275,100 @@ class FintechAPI:
             return False
 
     def consultar_operacoes(self, data_inicio: str, data_fim: str) -> Optional[List[Dict]]:
-        url = f"{self.config.API_BASE_URL}/inss/v1/operation"
-        params = {
-            'data_inicio': data_inicio,
-            'data_fim': data_fim,
-            'por_pagina': 200000
-        }
-        try:
-            response = self.session.get(url, params=params, timeout=self.config.TIMEOUT_REQUEST)
-            response.raise_for_status()
-            data = response.json()
-            operacoes = data.get('operacoes', []) or data.get('operations', [])
-            return operacoes
-        except Exception as e:
-            print(f"   ❌ Erro ao consultar operações: {e}")
-            return None
+        """
+        Consulta operações com paginação automática para evitar timeout
+        """
+        todas_operacoes = []
+        pagina = 1
+        registros_por_pagina = 100  # Reduzido para evitar timeout
+        total_operacoes = 0
+        
+        print(f"   Consultando operações com paginação...")
+        
+        while True:
+            url = f"{self.config.API_BASE_URL}/inss/v1/operation"
+            params = {
+                'data_inicio': data_inicio,
+                'data_fim': data_fim,
+                'pagina': pagina,
+                'por_pagina': registros_por_pagina
+            }
+            
+            try:
+                response = self.session.get(url, params=params, timeout=self.config.TIMEOUT_REQUEST)
+                response.raise_for_status()
+                data = response.json()
+                
+                # Extrai operações da resposta
+                operacoes = data.get('operacoes', []) or data.get('operations', [])
+                
+                if not operacoes:
+                    # Não há mais operações, finaliza
+                    break
+                
+                todas_operacoes.extend(operacoes)
+                total_atual = len(todas_operacoes)
+                
+                print(f"      Página {pagina}: {len(operacoes)} operações (total: {total_atual})")
+                
+                # Verifica se há mais páginas
+                # A API pode retornar informações de paginação de várias formas:
+                total_paginas = (
+                    data.get('total_pages') 
+                    or data.get('total_paginas')
+                    or data.get('pagination', {}).get('total_pages')
+                )
+                
+                total_registros = (
+                    data.get('total') 
+                    or data.get('total_records')
+                    or data.get('total_registros')
+                    or data.get('pagination', {}).get('total')
+                )
+                
+                # Se retornou menos registros que o solicitado, não há mais páginas
+                if len(operacoes) < registros_por_pagina:
+                    break
+                
+                # Se a API informou total de páginas e já chegamos nela
+                if total_paginas and pagina >= total_paginas:
+                    break
+                
+                # Se a API informou total de registros e já temos todos
+                if total_registros and len(todas_operacoes) >= total_registros:
+                    break
+                
+                pagina += 1
+                
+                # Pequeno delay para não sobrecarregar a API
+                time.sleep(0.1)
+                
+            except requests.exceptions.Timeout:
+                print(f"      ⚠️  Timeout na página {pagina}, tentando com menos registros...")
+                
+                # Reduz registros por página e tenta novamente
+                registros_por_pagina = max(50, registros_por_pagina // 2)
+                continue
+                
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 504:
+                    print(f"      ⚠️  Gateway timeout na página {pagina}, ajustando parâmetros...")
+                    registros_por_pagina = max(50, registros_por_pagina // 2)
+                    continue
+                else:
+                    print(f"      ❌ Erro HTTP na página {pagina}: {e}")
+                    break
+                    
+            except Exception as e:
+                print(f"      ❌ Erro ao consultar página {pagina}: {e}")
+                break
+        
+        if todas_operacoes:
+            print(f"   ✓ Total: {len(todas_operacoes)} operações encontradas em {pagina} página(s)")
+        else:
+            print(f"   ⚠️  Nenhuma operação encontrada")
+        
+        return todas_operacoes if todas_operacoes else None
 
     def consultar_detalhes_operacao(self, debt_key: str, credit_operation_key: str = None) -> Optional[Dict]:
         url = f"{self.config.API_BASE_URL}/inss/v1/operation/{debt_key}"
@@ -432,19 +566,32 @@ class GerenciadorCassandra:
         except Exception as e:
             print(f"❌ Erro ao limpar tabela Cassandra: {e}")
 
-    def converter_para_texto(self, valor):
-        """Converte qualquer valor para texto (string)"""
+    def converter_para_texto(self, valor, nome_coluna=None):
+        """
+        Converte valores para texto, tratando números especialmente
+        """
         if valor is None:
             return None
         
+        # Se é um campo numérico conhecido, normalizar o número
+        if nome_coluna and nome_coluna in CAMPOS_NUMERICOS:
+            return normalizar_numero(valor)
+        
+        # Se é string
         if isinstance(valor, str):
             if valor.strip() == '':
                 return None
             return valor
         
+        # Se é dict ou list, converter para JSON
         if isinstance(valor, (dict, list)):
             return json.dumps(valor, ensure_ascii=False)
         
+        # Tentar detectar se é número mesmo sem estar na lista
+        if isinstance(valor, (int, float)):
+            return normalizar_numero(valor)
+        
+        # Outros tipos: converter para string
         valor_str = str(valor)
         
         if valor_str.strip() == '':
@@ -453,24 +600,45 @@ class GerenciadorCassandra:
         return valor_str
 
     def converter_tipos_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Converte TUDO para texto - sem exceções"""
+        """
+        Converte campos do DataFrame tratando números corretamente
+        """
         df_convertido = df.copy()
         
-        print("   🔄 Convertendo TODOS os campos para TEXT...")
+        print("   🔄 Convertendo campos para TEXT (números normalizados)...")
         
+        # Processar cada coluna
         for col in df_convertido.columns:
-            df_convertido[col] = df_convertido[col].apply(self.converter_para_texto)
+            df_convertido[col] = df_convertido[col].apply(
+                lambda x: self.converter_para_texto(x, nome_coluna=col)
+            )
         
         return df_convertido
 
     def inserir_dados(self, df: pd.DataFrame):
-        """Insere dados no Cassandra em lotes - TUDO COMO TEXTO"""
+        """Insere dados no Cassandra em lotes"""
         if not self.session or df.empty:
             return
         
         try:
-            print("🔄 Preparando dados para Cassandra (modo TEXT)...")
+            print("🔄 Preparando dados para Cassandra...")
+            
+            # Mostrar amostra ANTES da conversão
+            print("\n📊 AMOSTRA DE DADOS ANTES DA CONVERSÃO:")
+            campos_amostra = ['val_liquido', 'val_emissao', 'val_seguro']
+            campos_disponiveis = [c for c in campos_amostra if c in df.columns]
+            if campos_disponiveis:
+                print(df[campos_disponiveis].head(3))
+                print(f"\nTipos: {df[campos_disponiveis].dtypes.to_dict()}")
+            
+            # Converter
             df = self.converter_tipos_dataframe(df)
+            
+            # Mostrar amostra DEPOIS da conversão
+            print("\n📊 AMOSTRA DE DADOS DEPOIS DA CONVERSÃO:")
+            if campos_disponiveis:
+                print(df[campos_disponiveis].head(3))
+                print(f"\nTipos: {df[campos_disponiveis].dtypes.to_dict()}")
             
             colunas = df.columns.tolist()
             placeholders = ', '.join(['?' for _ in colunas])
@@ -481,7 +649,7 @@ class GerenciadorCassandra:
             total_registros = len(df)
             registros_inseridos = 0
             
-            print(f"📤 Inserindo {total_registros} registros no Cassandra em lotes de {self.config.CASSANDRA_TAMANHO_PACOTE}...")
+            print(f"\n📤 Inserindo {total_registros} registros no Cassandra em lotes de {self.config.CASSANDRA_TAMANHO_PACOTE}...")
             
             for i in range(0, total_registros, self.config.CASSANDRA_TAMANHO_PACOTE):
                 batch = BatchStatement()
@@ -655,11 +823,35 @@ def executar_extracao():
     df_final = pd.DataFrame(todos_registros)
 
     # ---------------------------
-    # APLICAR TRADUÇÕES E FORMATAÇÕES
+    # NORMALIZAR CAMPOS NUMÉRICOS
     # ---------------------------
-    print("🌐 Aplicando traduções e formatações...")
+    print("🔢 Normalizando campos numéricos...")
     
-    # Traduzir campos
+    campos_normalizados = []
+    for campo in CAMPOS_NUMERICOS:
+        if campo in df_final.columns:
+            df_final[campo] = df_final[campo].apply(normalizar_numero)
+            campos_normalizados.append(campo)
+    
+    if campos_normalizados:
+        print(f"   ✓ {len(campos_normalizados)} campos numéricos normalizados:")
+        for i in range(0, len(campos_normalizados), 5):
+            print(f"      {', '.join(campos_normalizados[i:i+5])}")
+    
+    # Mostrar exemplos de valores normalizados
+    print("\n   📋 Exemplos de valores normalizados:")
+    campos_exemplo = ['val_liquido', 'val_emissao', 'qtd_parcela']
+    for campo in campos_exemplo:
+        if campo in df_final.columns:
+            valores_unicos = df_final[campo].dropna().unique()[:3]
+            if len(valores_unicos) > 0:
+                print(f"      {campo}: {list(valores_unicos)}")
+
+    # ---------------------------
+    # APLICAR TRADUÇÕES
+    # ---------------------------
+    print("\n🌐 Aplicando traduções...")
+    
     if 'credit_type' in df_final.columns:
         df_final['credit_type'] = df_final['credit_type'].apply(
             lambda x: traduzir_campo(x, 'credit_type')
@@ -685,24 +877,17 @@ def executar_extracao():
             lambda x: traduzir_campo(x, 'marital_status')
         )
     
-    # Formatar valores monetários para padrão brasileiro (1.000,02)
-    campos_monetarios = ['val_emissao', 'val_liquido', 'val_seguro','first_installment_value']
-    for campo in campos_monetarios:
-        if campo in df_final.columns:
-            df_final[campo] = df_final[campo].apply(formatar_valor_monetario)
-    
     print("   ✓ Traduções aplicadas:")
     print("      - credit_type (tipos de crédito)")
     print("      - assistance_type (tipos de benefício)")
     print("      - dsc_situacao_emprestimo (situações)")
     print("      - has_insurance (Sim/Não)")
     print("      - marital_status (estado civil)")
-    print("   ✓ Valores formatados: val_emissao, val_liquido, val_seguro (formato: 1.000,02)")
 
     # ---------------------------
-    # RECOMPUTAR historico_sequencia POR PROPOSTA COM ZERO PADDING
+    # RECOMPUTAR historico_sequencia COM ZERO PADDING
     # ---------------------------
-    print("🔄 Recalculando sequências de histórico com zero padding...")
+    print("\n🔄 Recalculando sequências de histórico com zero padding...")
     
     if 'historico_event_datetime' in df_final.columns:
         df_final['historico_event_datetime'] = pd.to_datetime(
@@ -742,11 +927,6 @@ def executar_extracao():
     df_final.drop(columns=['historico_sequencia_num', 'historico_sequencia_tmp'], inplace=True, errors='ignore')
     
     exemplos = df_final['historico_sequencia'].head(15).tolist()
-    print(f"   📋 Exemplos de sequências geradas: {exemplos}")
-    print(f"   ⭐ Asterisco (*) em todos os registros para garantir ordenação correta no BI")
-    
-    print(f"   ✓ Sequências recalculadas (formato: 01*, 02*, 03*... para melhor compatibilidade com BI)")
-
     # ---------------------------
     # Inserir no Cassandra
     # ---------------------------
@@ -755,11 +935,10 @@ def executar_extracao():
 
     cassandra.fechar_conexao()
 
-    print("\n✅ Processo finalizado com sucesso!")
-    print("📝 Resumo das transformações aplicadas:")
-    print("   ✓ Campos traduzidos para português")
-    print("   ✓ Valores monetários no formato brasileiro (1.000,02)")
-    print("   ✓ Sequências com zero padding e asterisco para ordenação")
+    print("\n" + "="*80)
+    print("✅ PROCESSO FINALIZADO COM SUCESSO!")
+    print("="*80)
+
 
 if __name__ == "__main__":
     executar_extracao()
